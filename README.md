@@ -4,7 +4,7 @@ This is a crude emulator of a standard machine architecture. It is a toy machine
 
 ## Architecture
 
-```mmd
+```mermaid
 flowchart LR
     subgraph Group 1 [CPU]
         Core <--> mc[Memory Controller]
