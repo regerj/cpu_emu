@@ -18,9 +18,11 @@ use crate::{
 };
 
 mod block;
+mod cache;
 mod cpu;
 mod mem;
 mod ops;
+mod telemetry;
 
 pub type WORD = u8;
 

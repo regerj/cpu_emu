@@ -3,7 +3,12 @@ use std::sync::mpsc;
 use crate::{
     WORD,
     block::Block,
+    telemetry_init,
+    telemetry_log,
+    telemetry_module,
 };
+
+telemetry_module!(dram);
 
 pub enum MemoryOps {
     Read(WORD),
@@ -19,6 +24,7 @@ pub struct MemoryController {
 
 impl MemoryController {
     pub fn read(&self, address: WORD) -> WORD {
+        telemetry_log!(300);
         self.tx
             .send(MemoryOps::Read(address))
             .expect("Panic in memory fabric");
@@ -29,6 +35,7 @@ impl MemoryController {
     }
 
     pub fn write(&mut self, address: WORD, value: WORD) {
+        telemetry_log!(300);
         self.tx
             .send(MemoryOps::Write(address, value))
             .expect("Panic in memory fabric");
@@ -56,6 +63,7 @@ pub struct Dram {
 
 impl Dram {
     pub fn new() -> (Self, MemoryController) {
+        telemetry_init!();
         let (op_tx, op_rx) = mpsc::channel();
         let (resp_tx, resp_rx) = mpsc::channel();
         let mc = MemoryController {

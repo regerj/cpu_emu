@@ -1,12 +1,19 @@
-use bitfield_struct::bitfield;
+telemetry_module!(cpu);
 
 use crate::{
     WORD,
+    cache::{
+        Cache,
+        CacheAddr,
+    },
     mem::MemoryController,
     ops::{
         OperandInner,
         Operation,
     },
+    telemetry_init,
+    telemetry_log,
+    telemetry_module,
 };
 
 #[derive(Debug)]
@@ -18,6 +25,7 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn new(mc: MemoryController) -> Self {
+        telemetry_init!();
         Self {
             regs: vec![0; 2],
             mc,
@@ -26,6 +34,7 @@ impl Cpu {
     }
 
     pub fn execute(&mut self, op: Operation) {
+        telemetry_log!(1);
         match op {
             Operation::Add(dest, src) => {
                 assert!(dest.can_store());
@@ -121,47 +130,4 @@ impl Drop for Cpu {
     fn drop(&mut self) {
         self.mc.kill();
     }
-}
-
-/// The cache is a 1 level 2-way set associative cache.
-///
-/// It utilizes 2 byte cache line size and has a total capacity of 16 cache lines.
-#[derive(Debug)]
-struct Cache {
-    inner: [[Option<CacheEntry>; 2]; 8],
-}
-
-impl Cache {
-    fn new() -> Self {
-        Self {
-            inner: [[None; 2]; 8],
-        }
-    }
-
-    fn lookup(&self, addr: &CacheAddr) -> Option<u16> {
-        self.inner[addr.index()].iter().find_map(|entry| {
-            let entry = (*entry)?;
-            if entry.tag == addr.tag() {
-                Some(entry.val)
-            } else {
-                None
-            }
-        })
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct CacheEntry {
-    tag: u8,
-    val: u16,
-}
-
-#[bitfield(u8)]
-struct CacheAddr {
-    #[bits(1)]
-    offset: usize,
-    #[bits(3)]
-    index: usize,
-    #[bits(4)]
-    tag: u8,
 }
