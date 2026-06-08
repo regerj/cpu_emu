@@ -1,4 +1,5 @@
 use bitfield_struct::bitfield;
+use rand::Rng;
 
 use crate::{
     telemetry_init,
@@ -7,6 +8,8 @@ use crate::{
 };
 
 telemetry_module!(cache);
+
+pub type CACHE_LINE = u16;
 
 /// The cache is a 1 level 2-way set associative cache.
 ///
@@ -24,8 +27,9 @@ impl Cache {
         }
     }
 
-    pub fn lookup(&self, addr: &CacheAddr) -> Option<u16> {
+    pub fn lookup(&self, addr: impl Into<CacheAddr>) -> Option<CACHE_LINE> {
         telemetry_log!(4);
+        let addr: CacheAddr = addr.into();
         self.inner[addr.index()].iter().find_map(|entry| {
             let entry = (*entry)?;
             if entry.tag == addr.tag() {
@@ -35,12 +39,39 @@ impl Cache {
             }
         })
     }
+
+    pub fn insert(&mut self, addr: impl Into<CacheAddr>, value: CACHE_LINE) {
+        let addr: CacheAddr = addr.into();
+        let new_entry = CacheEntry {
+            tag: addr.tag(),
+            val: value,
+        };
+        let set = &mut self.inner[addr.index()];
+
+        // If we have a match
+        if let Some(entry) = set.iter_mut().find(|entry| {
+            let Some(entry) = entry else {
+                return false;
+            };
+
+            entry.tag == addr.tag()
+        }) {
+            *entry = Some(new_entry);
+        } else if let Some(entry) = set.iter_mut().find(|entry| entry.is_none()) {
+            *entry = Some(new_entry);
+        } else {
+            // Otherwise, evict randomly :D
+            let mut rng = rand::rng();
+            let which = (rng.next_u32() & 0b1) as usize;
+            self.inner[addr.index()][which] = Some(new_entry);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct CacheEntry {
     tag: u8,
-    val: u16,
+    val: CACHE_LINE,
 }
 
 #[bitfield(u8)]

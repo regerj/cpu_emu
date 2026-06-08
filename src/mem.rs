@@ -50,7 +50,7 @@ impl MemoryController {
             .send(MemoryOps::Kill)
             .expect("Panic in memory fabric");
         // We just interpret some kind of response as "terminating"
-        self.rx.recv();
+        let _ = self.rx.recv();
     }
 }
 

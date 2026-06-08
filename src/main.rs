@@ -15,11 +15,13 @@ use crate::{
     cpu::Cpu,
     mem::Dram,
     ops::Operation,
+    telemetry::TELEMETRY,
 };
 
 mod block;
 mod cache;
 mod cpu;
+mod macros;
 mod mem;
 mod ops;
 mod telemetry;
@@ -43,6 +45,8 @@ fn main() -> Result<()> {
         cpu.execute(Operation::try_from(line.as_str())?);
         println!("{cpu:#?}");
     }
+
+    println!("{}", TELEMETRY.lock().expect("Telemetry poisoned"));
 
     Ok(())
 }

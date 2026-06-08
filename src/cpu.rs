@@ -2,7 +2,9 @@ telemetry_module!(cpu);
 
 use crate::{
     WORD,
+    aligned,
     cache::{
+        CACHE_LINE,
         Cache,
         CacheAddr,
     },
@@ -57,7 +59,7 @@ impl Cpu {
                     // We asserted storable, so we know the literal is an address
                     OperandInner::Literal => {
                         let dest_val = self.read_addr(dest.word);
-                        self.mc.write(dest.word, dest_val + src_word);
+                        self.write_addr(dest.word, dest_val + src_word);
                     }
                 }
             }
@@ -115,14 +117,46 @@ impl Cpu {
 
     /// Attempt to read the given address from the cache. Failing that, fallback to reading it from
     /// the memory controller.
-    fn read_addr(&self, addr: WORD) -> WORD {
-        let cache_addr = CacheAddr::from_bits(addr);
-        if let Some(cache_entry) = self.cache.lookup(&cache_addr) {
-            let val = (cache_entry >> (8 * cache_addr.offset()) & 0xFF) as u8;
-            return val;
+    fn read_addr(&mut self, addr: WORD) -> WORD {
+        let cache_addr: CacheAddr = addr.into();
+        let cache_line = self.read_cache_line(addr);
+
+        (cache_line >> cache_addr.offset()) as WORD
+    }
+
+    fn read_cache_line(&mut self, addr: impl Into<CacheAddr>) -> CACHE_LINE {
+        let cache_addr = addr.into();
+        if let Some(cache_entry) = self.cache.lookup(cache_addr) {
+            return cache_entry;
         }
 
-        self.mc.read(addr)
+        let cache_line = self.read_cache_line_from_mem(cache_addr.into_bits());
+        // Our cpu can use cache line without rereading
+        self.cache.insert(cache_addr, cache_line);
+
+        cache_line
+    }
+
+    fn write_addr(&mut self, addr: WORD, value: WORD) {
+        let cache_addr: CacheAddr = addr.into();
+        let mut cache_line = self.read_cache_line(addr);
+        let zero_mask: CACHE_LINE = !((WORD::MAX as CACHE_LINE) << (cache_addr.offset() * 8));
+        cache_line &= zero_mask;
+
+        cache_line |= (value as CACHE_LINE) << (cache_addr.offset() * 8);
+        self.cache.insert(addr, cache_line);
+    }
+
+    /// Read an entire cache line from main memory
+    fn read_cache_line_from_mem(&self, addr: WORD) -> CACHE_LINE {
+        let mut cache_line: CACHE_LINE = 0;
+
+        for i in 0..std::mem::size_of::<CACHE_LINE>() {
+            let byte = self.mc.read(aligned!(addr) + i as WORD);
+            cache_line |= (byte as CACHE_LINE) << (8 * i);
+        }
+
+        cache_line
     }
 }
 
