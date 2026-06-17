@@ -1,5 +1,8 @@
+use std::fmt::Display;
+
 use bitfield_struct::bitfield;
 use rand::Rng;
+use ratatui::widgets::Widget;
 
 use crate::{
     telemetry_init,
@@ -9,7 +12,7 @@ use crate::{
 
 telemetry_module!(cache);
 
-pub type CACHE_LINE = u16;
+pub type CacheLine = u16;
 
 /// The cache is a 1 level 2-way set associative cache.
 ///
@@ -27,7 +30,7 @@ impl Cache {
         }
     }
 
-    pub fn lookup(&self, addr: impl Into<CacheAddr>) -> Option<CACHE_LINE> {
+    pub fn lookup(&self, addr: impl Into<CacheAddr>) -> Option<CacheLine> {
         telemetry_log!(4);
         let addr: CacheAddr = addr.into();
         self.inner[addr.index()].iter().find_map(|entry| {
@@ -40,7 +43,7 @@ impl Cache {
         })
     }
 
-    pub fn insert(&mut self, addr: impl Into<CacheAddr>, value: CACHE_LINE) {
+    pub fn insert(&mut self, addr: impl Into<CacheAddr>, value: CacheLine) {
         let addr: CacheAddr = addr.into();
         let new_entry = CacheEntry {
             tag: addr.tag(),
@@ -68,10 +71,69 @@ impl Cache {
     }
 }
 
+impl Widget for &Cache {
+    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
+    where
+        Self: Sized,
+    {
+        use ratatui::{
+            layout::{
+                Constraint,
+                Direction,
+                Layout,
+            },
+            text::{
+                Line,
+                Text,
+            },
+            widgets::{
+                Block,
+                Paragraph,
+            },
+        };
+
+        let chunks = Layout::new(
+            Direction::Horizontal,
+            [Constraint::Percentage(50), Constraint::Percentage(50)],
+        )
+        .split(area);
+
+        let way0_strings: Vec<_> = self
+            .inner
+            .iter()
+            .map(|set| {
+                set[0]
+                    .map(|entry| Line::from(entry.to_string()))
+                    .unwrap_or_default()
+            })
+            .collect();
+        let way0 = Paragraph::new(Text::from(way0_strings)).block(Block::bordered());
+        let way1_strings: Vec<_> = self
+            .inner
+            .iter()
+            .map(|set| {
+                set[1]
+                    .map(|entry| Line::from(entry.to_string()))
+                    .unwrap_or_default()
+            })
+            .collect();
+        let way1 = Paragraph::new(Text::from(way1_strings)).block(Block::bordered());
+
+        way0.render(chunks[0], buf);
+        way1.render(chunks[1], buf);
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct CacheEntry {
     tag: u8,
-    val: CACHE_LINE,
+    val: CacheLine,
+}
+
+impl Display for CacheEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "0x{:x}: 0x{:x}", self.tag, self.val)
+    }
 }
 
 #[bitfield(u8)]

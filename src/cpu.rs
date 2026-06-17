@@ -4,9 +4,9 @@ use crate::{
     WORD,
     aligned,
     cache::{
-        CACHE_LINE,
         Cache,
         CacheAddr,
+        CacheLine,
     },
     mem::MemoryController,
     ops::{
@@ -22,7 +22,7 @@ use crate::{
 pub struct Cpu {
     regs: Vec<WORD>,
     mc: MemoryController,
-    cache: Cache,
+    pub cache: Cache,
 }
 
 impl Cpu {
@@ -121,10 +121,10 @@ impl Cpu {
         let cache_addr: CacheAddr = addr.into();
         let cache_line = self.read_cache_line(addr);
 
-        (cache_line >> cache_addr.offset()) as WORD
+        (cache_line >> (cache_addr.offset() * 8)) as WORD
     }
 
-    fn read_cache_line(&mut self, addr: impl Into<CacheAddr>) -> CACHE_LINE {
+    fn read_cache_line(&mut self, addr: impl Into<CacheAddr>) -> CacheLine {
         let cache_addr = addr.into();
         if let Some(cache_entry) = self.cache.lookup(cache_addr) {
             return cache_entry;
@@ -140,20 +140,20 @@ impl Cpu {
     fn write_addr(&mut self, addr: WORD, value: WORD) {
         let cache_addr: CacheAddr = addr.into();
         let mut cache_line = self.read_cache_line(addr);
-        let zero_mask: CACHE_LINE = !((WORD::MAX as CACHE_LINE) << (cache_addr.offset() * 8));
+        let zero_mask: CacheLine = !((WORD::MAX as CacheLine) << (cache_addr.offset() * 8));
         cache_line &= zero_mask;
 
-        cache_line |= (value as CACHE_LINE) << (cache_addr.offset() * 8);
+        cache_line |= (value as CacheLine) << (cache_addr.offset() * 8);
         self.cache.insert(addr, cache_line);
     }
 
     /// Read an entire cache line from main memory
-    fn read_cache_line_from_mem(&self, addr: WORD) -> CACHE_LINE {
-        let mut cache_line: CACHE_LINE = 0;
+    fn read_cache_line_from_mem(&self, addr: WORD) -> CacheLine {
+        let mut cache_line: CacheLine = 0;
 
-        for i in 0..std::mem::size_of::<CACHE_LINE>() {
+        for i in 0..std::mem::size_of::<CacheLine>() {
             let byte = self.mc.read(aligned!(addr) + i as WORD);
-            cache_line |= (byte as CACHE_LINE) << (8 * i);
+            cache_line |= (byte as CacheLine) << (8 * i);
         }
 
         cache_line
