@@ -1,5 +1,13 @@
 telemetry_module!(cpu);
 
+use std::{
+    ops::{
+        Index,
+        IndexMut,
+    },
+    vec::IntoIter,
+};
+
 use crate::{
     WORD,
     aligned,
@@ -20,24 +28,111 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Cpu {
-    regs: Vec<WORD>,
+    pub regs: Regs,
     mc: MemoryController,
     pub cache: Cache,
+    instructions: IntoIter<crate::ops::Operation>,
+}
+
+impl Widget for Cpu {
+    fn render(self, area: Rect, buf: &mut Buffer)
+    where
+        Self: Sized,
+    {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Regs {
+    r0: WORD,
+    r1: WORD,
+    r2: WORD,
+    r3: WORD,
+}
+
+use ratatui::{
+    buffer::Buffer,
+    layout::{
+        Layout,
+        Rect,
+    },
+    style::{
+        Modifier,
+        Style,
+    },
+    text::{
+        Line,
+        Span,
+    },
+    widgets::{
+        Block,
+        Paragraph,
+        Widget,
+    },
+};
+
+impl Widget for &Regs {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let lines = vec![
+            Line::from(vec![Span::styled(
+                "Reg │ Value",
+                Style::default().add_modifier(Modifier::BOLD),
+            )]),
+            Line::from("────┼────────"),
+            Line::from(format!("R0  │ 0x{:02X}", self.r0)),
+            Line::from(format!("R1  │ 0x{:02X}", self.r1)),
+            Line::from(format!("R2  │ 0x{:02X}", self.r2)),
+            Line::from(format!("R3  │ 0x{:02X}", self.r3)),
+        ];
+
+        Paragraph::new(lines)
+            .block(Block::bordered().title("Registers"))
+            .render(area, buf);
+    }
+}
+
+impl Index<usize> for Regs {
+    type Output = WORD;
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.r0,
+            1 => &self.r1,
+            2 => &self.r2,
+            3 => &self.r3,
+            _ => panic!("Invalid register identifier"),
+        }
+    }
+}
+
+impl IndexMut<usize> for Regs {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        match index {
+            0 => &mut self.r0,
+            1 => &mut self.r1,
+            2 => &mut self.r2,
+            3 => &mut self.r3,
+            _ => panic!("Invalid register identifier"),
+        }
+    }
 }
 
 impl Cpu {
-    pub fn new(mc: MemoryController) -> Self {
+    pub fn new(mc: MemoryController, instructions: IntoIter<crate::ops::Operation>) -> Self {
         telemetry_init!();
         Self {
-            regs: vec![0; 2],
+            regs: Regs::default(),
             mc,
             cache: Cache::new(),
+            instructions,
         }
     }
 
-    pub fn execute(&mut self, op: Operation) {
+    pub fn execute(&mut self) -> Option<()> {
         telemetry_log!(1);
-        match op {
+
+        let instruction = self.instructions.next()?;
+        match instruction {
             Operation::Add(dest, src) => {
                 assert!(dest.can_store());
 
@@ -84,7 +179,7 @@ impl Cpu {
                     // We asserted storable, so we know the literal is an address
                     OperandInner::Literal => {
                         let dest_val = self.read_addr(dest.word);
-                        self.mc.write(dest.word, dest_val - src_word);
+                        self.write_addr(dest.word, dest_val - src_word);
                     }
                 }
             }
@@ -108,11 +203,13 @@ impl Cpu {
                     }
                     // We asserted storable, so we know the literal is an address
                     OperandInner::Literal => {
-                        self.mc.write(dest.word, src_word);
+                        self.write_addr(dest.word, src_word);
                     }
                 }
             }
         }
+
+        Some(())
     }
 
     /// Attempt to read the given address from the cache. Failing that, fallback to reading it from

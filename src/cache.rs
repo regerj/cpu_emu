@@ -2,7 +2,11 @@ use std::fmt::Display;
 
 use bitfield_struct::bitfield;
 use rand::Rng;
-use ratatui::widgets::Widget;
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    widgets::Widget,
+};
 
 use crate::{
     telemetry_init,
@@ -72,19 +76,15 @@ impl Cache {
 }
 
 impl Widget for &Cache {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
-        Self: Sized,
-    {
+    fn render(self, area: Rect, buf: &mut Buffer) {
         use ratatui::{
-            layout::{
-                Constraint,
-                Direction,
-                Layout,
+            style::{
+                Modifier,
+                Style,
             },
             text::{
                 Line,
-                Text,
+                Span,
             },
             widgets::{
                 Block,
@@ -92,35 +92,30 @@ impl Widget for &Cache {
             },
         };
 
-        let chunks = Layout::new(
-            Direction::Horizontal,
-            [Constraint::Percentage(50), Constraint::Percentage(50)],
-        )
-        .split(area);
+        let mut lines = vec![
+            Line::from(vec![Span::styled(
+                "Idx │ Way 0        │ Way 1",
+                Style::default().add_modifier(Modifier::BOLD),
+            )]),
+            Line::from("────┼──────────────┼──────────────"),
+        ];
 
-        let way0_strings: Vec<_> = self
-            .inner
-            .iter()
-            .map(|set| {
-                set[0]
-                    .map(|entry| Line::from(entry.to_string()))
-                    .unwrap_or_default()
-            })
-            .collect();
-        let way0 = Paragraph::new(Text::from(way0_strings)).block(Block::bordered());
-        let way1_strings: Vec<_> = self
-            .inner
-            .iter()
-            .map(|set| {
-                set[1]
-                    .map(|entry| Line::from(entry.to_string()))
-                    .unwrap_or_default()
-            })
-            .collect();
-        let way1 = Paragraph::new(Text::from(way1_strings)).block(Block::bordered());
+        lines.extend(self.inner.iter().enumerate().map(|(idx, set)| {
+            let fmt = |e: Option<CacheEntry>| {
+                e.map(|e| format!("[{e}]"))
+                    .unwrap_or_else(|| "[----]".to_string())
+            };
 
-        way0.render(chunks[0], buf);
-        way1.render(chunks[1], buf);
+            Line::from(format!(
+                "{idx:>3} │ {:<12} │ {:<12}",
+                fmt(set[0]),
+                fmt(set[1]),
+            ))
+        }));
+
+        Paragraph::new(lines)
+            .block(Block::bordered().title("L1 Cache"))
+            .render(area, buf);
     }
 }
 
@@ -132,7 +127,7 @@ pub struct CacheEntry {
 
 impl Display for CacheEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "0x{:x}: 0x{:x}", self.tag, self.val)
+        write!(f, "0x{:x}:0x{:04x}", self.tag, self.val)
     }
 }
 
