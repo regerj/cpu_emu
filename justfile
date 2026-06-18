@@ -15,3 +15,6 @@ fmt:
 
 run:
     @cargo run -- ./test.bin
+
+dbg:
+    @rust-gdb --args cargo run -- ./test.bin

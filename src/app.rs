@@ -25,13 +25,13 @@ use ratatui::{
 use crate::{
     block::Block,
     cpu::Cpu,
-    mem::Dram,
+    mem::{Dram, DramMirror},
     ops::Operation,
-    ui::render,
 };
 
 pub struct App {
     cpu: Cpu,
+    dram_mirror: DramMirror,
 }
 
 impl App {
@@ -44,16 +44,16 @@ impl App {
 
         let instructions: Vec<Operation> = instructions
             .lines()
-            .into_iter()
             .map(|instruction| Operation::try_from(instruction?.as_str()))
             .collect::<Result<Vec<Operation>, _>>()?;
 
         let (memory, mc) = Dram::new();
         let cpu = Cpu::new(mc, instructions.into_iter());
+        let dram_mirror = memory.mirror();
 
         // Start our DRAM block
         std::thread::spawn(|| memory.dispatch());
-        Ok(Self { cpu })
+        Ok(Self { cpu, dram_mirror })
     }
 
     pub fn run(&mut self) -> Result<()> {
@@ -65,6 +65,9 @@ impl App {
             if self.cpu.execute().is_none() {
                 break;
             }
+
+            // DRAM mirror updates from writes
+            self.dram_mirror.update();
         }
 
         ratatui::restore();
@@ -73,10 +76,10 @@ impl App {
     }
 
     fn render_ui(&self, frame: &mut Frame) {
-        let chunks = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(frame.area());
-        frame.render_widget(&self.cpu.regs, chunks[0]);
-        frame.render_widget(&self.cpu.cache, chunks[1]);
+        let chunks = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).split(frame.area());
+        let (cpu_chunk, dram_chunk) = (chunks[0], chunks[1]);
+        frame.render_widget(&self.cpu, cpu_chunk);
+        frame.render_widget(&self.dram_mirror, dram_chunk);
     }
 
     fn handle_input(&mut self) -> Result<()> {

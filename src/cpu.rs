@@ -34,12 +34,28 @@ pub struct Cpu {
     instructions: IntoIter<crate::ops::Operation>,
 }
 
-impl Widget for Cpu {
+impl Widget for &Cpu {
     fn render(self, area: Rect, buf: &mut Buffer)
     where
         Self: Sized,
     {
-        unimplemented!()
+        let chunks = Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).split(area);
+        let (upper_chunk, lower_chunk) = (chunks[0], chunks[1]);
+
+        let chunks = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).split(upper_chunk);
+        let (left_chunk, right_chunk) = (chunks[0], chunks[1]);
+
+        let mut iter = self.instructions.as_ref().iter();
+        let mut instructions = vec![];
+        if let Some(instruction) = iter.next() {
+            instructions.push(Line::from(instruction.to_string()).style(Style::default().bold()));
+        }
+
+        iter.for_each(|elem| instructions.push(Line::from(elem.to_string()).style(Style::default().dim())));
+
+        Paragraph::new(instructions).block(Block::bordered().title("Instructions")).render(left_chunk, buf);
+        self.regs.render(right_chunk, buf);
+        self.cache.render(lower_chunk, buf);
     }
 }
 
@@ -54,8 +70,7 @@ pub struct Regs {
 use ratatui::{
     buffer::Buffer,
     layout::{
-        Layout,
-        Rect,
+        Constraint, Layout, Rect
     },
     style::{
         Modifier,
@@ -242,6 +257,7 @@ impl Cpu {
 
         cache_line |= (value as CacheLine) << (cache_addr.offset() * 8);
         self.cache.insert(addr, cache_line);
+        self.mc.write(addr, value);
     }
 
     /// Read an entire cache line from main memory
