@@ -11,6 +11,7 @@ clippy:
     @cargo clippy
 
 fmt:
+    @# We fmt with nightly because I like vertical import fmt which is unstable
     @cargo +nightly fmt
 
 run:

@@ -1,4 +1,7 @@
-use std::fmt::{Display, write};
+use std::fmt::{
+    Display,
+    write,
+};
 
 use anyhow::{
     Context,
@@ -96,7 +99,11 @@ impl Operand {
 impl Display for Operand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let star = if self.deref { "*" } else { "" };
-        let reg = if self.ty == OperandInner::Register { "$" } else { "" };
+        let reg = if self.ty == OperandInner::Register {
+            "$"
+        } else {
+            ""
+        };
         write!(f, "{star}{reg}{}", self.word)
     }
 }

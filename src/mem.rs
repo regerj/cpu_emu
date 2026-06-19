@@ -1,5 +1,13 @@
 use crossbeam::channel;
-use ratatui::{buffer::Buffer, layout::Rect, style::{Color, Style}, widgets::Widget};
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    style::{
+        Color,
+        Style,
+    },
+    widgets::Widget,
+};
 
 use crate::{
     WORD,
@@ -60,6 +68,7 @@ pub struct Dram {
     inner: Vec<u8>,
     tx: channel::Sender<Option<WORD>>,
     rx: channel::Receiver<MemoryOps>,
+    mirror: Option<channel::Sender<MemoryOps>>,
 }
 
 impl Dram {
@@ -73,18 +82,21 @@ impl Dram {
         };
         (
             Self {
-                inner: vec![0; WORD::MAX as usize],
+                inner: vec![0; WORD::MAX as usize + 1],
                 tx: resp_tx,
                 rx: op_rx,
+                mirror: None,
             },
             mc,
         )
     }
-    
-    pub fn mirror(&self) -> DramMirror {
+
+    pub fn mirror(&mut self) -> DramMirror {
+        let (mirror_tx, mirror_rx) = crossbeam::channel::unbounded();
+        self.mirror = Some(mirror_tx);
         DramMirror {
             inner: self.inner.clone(),
-            rx: self.rx.clone(),
+            rx: mirror_rx,
         }
     }
 }
@@ -101,7 +113,12 @@ impl Block for Dram {
                 }
                 MemoryOps::Write(addr, value) => {
                     self.inner[addr as usize] = value;
-                    self.tx.send(None).expect("Panic in memory fabric")
+                    self.tx.send(None).expect("Panic in memory fabric");
+
+                    // Replicate our write op to the mirror
+                    if let Some(mirror) = self.mirror.as_ref() {
+                        mirror.send(op).expect("Panic in memory mirror");
+                    }
                 }
                 MemoryOps::Kill => return,
             }
@@ -118,7 +135,6 @@ impl DramMirror {
     pub fn update(&mut self) {
         while let Ok(op) = self.rx.try_recv() {
             if let MemoryOps::Write(addr, value) = op {
-                eprintln!("Writing to addr: {addr} with value: {value}");
                 self.inner[addr as usize] = value;
             }
         }
@@ -127,8 +143,7 @@ impl DramMirror {
 
 impl Widget for &DramMirror {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let block = ratatui::widgets::Block::bordered()
-            .title("DRAM");
+        let block = ratatui::widgets::Block::bordered().title("DRAM");
 
         let inner = block.inner(area);
         block.render(area, buf);

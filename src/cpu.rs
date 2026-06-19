@@ -39,10 +39,12 @@ impl Widget for &Cpu {
     where
         Self: Sized,
     {
-        let chunks = Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).split(area);
+        let chunks =
+            Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).split(area);
         let (upper_chunk, lower_chunk) = (chunks[0], chunks[1]);
 
-        let chunks = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).split(upper_chunk);
+        let chunks = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(upper_chunk);
         let (left_chunk, right_chunk) = (chunks[0], chunks[1]);
 
         let mut iter = self.instructions.as_ref().iter();
@@ -51,9 +53,13 @@ impl Widget for &Cpu {
             instructions.push(Line::from(instruction.to_string()).style(Style::default().bold()));
         }
 
-        iter.for_each(|elem| instructions.push(Line::from(elem.to_string()).style(Style::default().dim())));
+        iter.for_each(|elem| {
+            instructions.push(Line::from(elem.to_string()).style(Style::default().dim()))
+        });
 
-        Paragraph::new(instructions).block(Block::bordered().title("Instructions")).render(left_chunk, buf);
+        Paragraph::new(instructions)
+            .block(Block::bordered().title("Instructions"))
+            .render(left_chunk, buf);
         self.regs.render(right_chunk, buf);
         self.cache.render(lower_chunk, buf);
     }
@@ -70,7 +76,9 @@ pub struct Regs {
 use ratatui::{
     buffer::Buffer,
     layout::{
-        Constraint, Layout, Rect
+        Constraint,
+        Layout,
+        Rect,
     },
     style::{
         Modifier,

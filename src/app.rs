@@ -25,7 +25,10 @@ use ratatui::{
 use crate::{
     block::Block,
     cpu::Cpu,
-    mem::{Dram, DramMirror},
+    mem::{
+        Dram,
+        DramMirror,
+    },
     ops::Operation,
 };
 
@@ -47,7 +50,7 @@ impl App {
             .map(|instruction| Operation::try_from(instruction?.as_str()))
             .collect::<Result<Vec<Operation>, _>>()?;
 
-        let (memory, mc) = Dram::new();
+        let (mut memory, mc) = Dram::new();
         let cpu = Cpu::new(mc, instructions.into_iter());
         let dram_mirror = memory.mirror();
 
@@ -76,7 +79,8 @@ impl App {
     }
 
     fn render_ui(&self, frame: &mut Frame) {
-        let chunks = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).split(frame.area());
+        let chunks = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(frame.area());
         let (cpu_chunk, dram_chunk) = (chunks[0], chunks[1]);
         frame.render_widget(&self.cpu, cpu_chunk);
         frame.render_widget(&self.dram_mirror, dram_chunk);
