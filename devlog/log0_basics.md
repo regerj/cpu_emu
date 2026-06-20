@@ -124,4 +124,4 @@ ins --> cpu
 
 We have also defined our syntax for our basic assembly language. In the next devlog, we will explore some code implementations.
 
-[Next DevLog](./TODO)
+[Next DevLog](./log1_cache.md)

@@ -1,5 +1,12 @@
+use std::fmt::Display;
+
 use bitfield_struct::bitfield;
 use rand::Rng;
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    widgets::Widget,
+};
 
 use crate::{
     telemetry_init,
@@ -9,25 +16,27 @@ use crate::{
 
 telemetry_module!(cache);
 
-pub type CACHE_LINE = u16;
+pub type CacheLine = u16;
+const WAYS: usize = 2;
+const SETS: usize = 8;
 
 /// The cache is a 1 level 2-way set associative cache.
 ///
 /// It utilizes 2 byte cache line size and has a total capacity of 16 cache lines.
 #[derive(Debug)]
 pub struct Cache {
-    inner: [[Option<CacheEntry>; 2]; 8],
+    inner: [[Option<CacheEntry>; WAYS]; SETS],
 }
 
 impl Cache {
     pub fn new() -> Self {
         telemetry_init!();
         Self {
-            inner: [[None; 2]; 8],
+            inner: [[None; WAYS]; SETS],
         }
     }
 
-    pub fn lookup(&self, addr: impl Into<CacheAddr>) -> Option<CACHE_LINE> {
+    pub fn lookup(&self, addr: impl Into<CacheAddr>) -> Option<CacheLine> {
         telemetry_log!(4);
         let addr: CacheAddr = addr.into();
         self.inner[addr.index()].iter().find_map(|entry| {
@@ -40,7 +49,7 @@ impl Cache {
         })
     }
 
-    pub fn insert(&mut self, addr: impl Into<CacheAddr>, value: CACHE_LINE) {
+    pub fn insert(&mut self, addr: impl Into<CacheAddr>, value: CacheLine) {
         let addr: CacheAddr = addr.into();
         let new_entry = CacheEntry {
             tag: addr.tag(),
@@ -68,10 +77,60 @@ impl Cache {
     }
 }
 
+impl Widget for &Cache {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        use ratatui::{
+            style::{
+                Modifier,
+                Style,
+            },
+            text::{
+                Line,
+                Span,
+            },
+            widgets::{
+                Block,
+                Paragraph,
+            },
+        };
+
+        let mut lines = vec![
+            Line::from(vec![Span::styled(
+                "Idx │ Way 0        │ Way 1",
+                Style::default().add_modifier(Modifier::BOLD),
+            )]),
+            Line::from("────┼──────────────┼──────────────"),
+        ];
+
+        lines.extend(self.inner.iter().enumerate().map(|(idx, set)| {
+            let fmt = |e: Option<CacheEntry>| {
+                e.map(|e| format!("[{e}]"))
+                    .unwrap_or_else(|| "[----]".to_string())
+            };
+
+            Line::from(format!(
+                "{idx:>3} │ {:<12} │ {:<12}",
+                fmt(set[0]),
+                fmt(set[1]),
+            ))
+        }));
+
+        Paragraph::new(lines)
+            .block(Block::bordered().title("L1 Cache"))
+            .render(area, buf);
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct CacheEntry {
     tag: u8,
-    val: CACHE_LINE,
+    val: CacheLine,
+}
+
+impl Display for CacheEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "0x{:x}:0x{:04x}", self.tag, self.val)
+    }
 }
 
 #[bitfield(u8)]

@@ -1,3 +1,8 @@
+use std::fmt::{
+    Display,
+    write,
+};
+
 use anyhow::{
     Context,
     bail,
@@ -10,6 +15,17 @@ pub enum Operation {
     Add(Operand, Operand),
     Sub(Operand, Operand),
     Mov(Operand, Operand),
+}
+
+impl Display for Operation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let instruction = match self {
+            Self::Add(op0, op1) => format!("add {op0},{op1}"),
+            Self::Sub(op0, op1) => format!("sub {op0},{op1}"),
+            Self::Mov(op0, op1) => format!("mov {op0},{op1}"),
+        };
+        write!(f, "{instruction}")
+    }
 }
 
 impl TryFrom<&str> for Operation {
@@ -80,6 +96,18 @@ impl Operand {
     }
 }
 
+impl Display for Operand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let star = if self.deref { "*" } else { "" };
+        let reg = if self.ty == OperandInner::Register {
+            "$"
+        } else {
+            ""
+        };
+        write!(f, "{star}{reg}{}", self.word)
+    }
+}
+
 impl TryFrom<&str> for Operand {
     type Error = anyhow::Error;
 
@@ -112,7 +140,7 @@ impl TryFrom<&str> for Operand {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum OperandInner {
     Register,
     Literal,
