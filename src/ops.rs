@@ -81,27 +81,30 @@ impl TryFrom<&str> for Operation {
 }
 
 #[derive(Debug)]
-pub struct Operand {
-    pub ty: OperandInner,
-    pub word: Word,
-    pub deref: bool,
+pub enum Operand {
+    LValue(OperandInner),
+    RValue(OperandInner),
 }
 
 impl Operand {
-    pub fn can_store(&self) -> bool {
-        self.deref || matches!(self.ty, OperandInner::Register)
+    pub fn inner(&self) -> &OperandInner {
+        match self {
+            Self::LValue(inner) => inner,
+            Self::RValue(inner) => inner,
+        }
     }
 }
 
 impl Display for Operand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let star = if self.deref { "*" } else { "" };
-        let reg = if self.ty == OperandInner::Register {
-            "$"
-        } else {
-            ""
+        let star = match self {
+            Self::LValue(..) => "*",
+            _ => "",
         };
-        write!(f, "{star}{reg}{}", self.word)
+
+        let inner = self.inner();
+
+        write!(f, "{star}{inner}")
     }
 }
 
@@ -117,7 +120,7 @@ impl TryFrom<&str> for Operand {
             false
         };
 
-        let ty = if *iter.peek().context(format!("Invalid operand: {}", value))? == '$' {
+        let constructor = if *iter.peek().context(format!("Invalid operand: {}", value))? == '$' {
             iter.next();
             OperandInner::Register
         } else {
@@ -129,16 +132,38 @@ impl TryFrom<&str> for Operand {
             .parse()
             .context(format!("Invalid operand: {}", value))?;
 
-        Ok(Self {
-            ty,
-            word: val,
-            deref,
+        Ok(if deref {
+            Self::LValue(constructor(val))
+        } else {
+            Self::RValue(constructor(val))
         })
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub enum OperandInner {
-    Register,
-    Literal,
+    Register(Word),
+    Literal(Word),
+}
+
+impl OperandInner {
+    pub fn inner(&self) -> Word {
+        match self {
+            Self::Register(word) => *word,
+            Self::Literal(word) => *word,
+        }
+    }
+}
+
+impl Display for OperandInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let reg = match self {
+            Self::Register(..) => "$",
+            Self::Literal(..) => "",
+        };
+
+        let word = self.inner();
+
+        write!(f, "{reg}{word}")
+    }
 }

@@ -10,6 +10,7 @@ use ratatui::{
 
 use crate::{
     cfg::{
+        CHANGE_STYLE,
         CONFIG,
         CONST_CONFIG,
         CacheLine,
@@ -24,6 +25,7 @@ telemetry_module!(cache);
 #[derive(Debug)]
 pub struct Cache {
     inner: [[Option<CacheEntry>; CONST_CONFIG.cache.ways]; CONST_CONFIG.cache.sets],
+    highlighted: Vec<(usize, usize)>,
 }
 
 impl Cache {
@@ -31,6 +33,7 @@ impl Cache {
         telemetry_init!();
         Self {
             inner: [[None; CONST_CONFIG.cache.ways]; CONST_CONFIG.cache.sets],
+            highlighted: vec![],
         }
     }
 
@@ -47,6 +50,12 @@ impl Cache {
         })
     }
 
+    /// Insert a cache line into the cache.
+    ///
+    /// The address does not necessarily need to be cache aligned, but the offset will be ignored.
+    /// If you want to store a byte at a non-cache aligned address in the cache, you are responsible
+    /// for shifting the byte to the correct position within the cache line prior to calling this
+    /// function.
     pub fn insert(&mut self, addr: impl Into<CacheAddr>, value: CacheLine) {
         telemetry_log!(CONFIG.cycles.l1_cache_write);
         let addr: CacheAddr = addr.into();
@@ -57,7 +66,7 @@ impl Cache {
         let set = &mut self.inner[addr.index()];
 
         // If we have a match
-        if let Some(entry) = set.iter_mut().find(|entry| {
+        if let Some((i, entry)) = set.iter_mut().enumerate().find(|(_, entry)| {
             let Some(entry) = entry else {
                 return false;
             };
@@ -65,14 +74,25 @@ impl Cache {
             entry.tag == addr.tag()
         }) {
             *entry = Some(new_entry);
-        } else if let Some(entry) = set.iter_mut().find(|entry| entry.is_none()) {
+            self.highlighted.push((addr.index(), i));
+        } else if let Some((i, entry)) = set
+            .iter_mut()
+            .enumerate()
+            .find(|(_, entry)| entry.is_none())
+        {
             *entry = Some(new_entry);
+            self.highlighted.push((addr.index(), i));
         } else {
             // Otherwise, evict randomly :D
             let mut rng = rand::rng();
             let which = (rng.next_u32() & 0b1) as usize;
             self.inner[addr.index()][which] = Some(new_entry);
+            self.highlighted.push((addr.index(), which));
         }
+    }
+
+    pub fn clear_highlights(&mut self) {
+        self.highlighted.clear();
     }
 }
 
@@ -103,15 +123,32 @@ impl Widget for &Cache {
 
         lines.extend(self.inner.iter().enumerate().map(|(idx, set)| {
             let fmt = |e: Option<CacheEntry>| {
-                e.map(|e| format!("[{e}]"))
-                    .unwrap_or_else(|| "[----]".to_string())
+                Span::from(
+                    e.map(|e| format!("[{e}]"))
+                        .unwrap_or_else(|| "[----]".to_string()),
+                )
             };
 
-            Line::from(format!(
-                "{idx:>3} │ {:<12} │ {:<12}",
-                fmt(set[0]),
-                fmt(set[1]),
-            ))
+            let first = if self.highlighted.contains(&(idx, 0)) {
+                fmt(set[0]).style(*CHANGE_STYLE)
+            } else {
+                fmt(set[0])
+            };
+
+            let second = if self.highlighted.contains(&(idx, 1)) {
+                fmt(set[1]).style(*CHANGE_STYLE)
+            } else {
+                fmt(set[1])
+            };
+
+            let seperator = Span::from(" | ");
+            Line::from(vec![
+                Span::from(format!("{idx:>3}")),
+                seperator.clone(),
+                first,
+                seperator,
+                second,
+            ])
         }));
 
         Paragraph::new(lines)
@@ -120,7 +157,7 @@ impl Widget for &Cache {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CacheEntry {
     tag: u16,
     val: CacheLine,
@@ -140,4 +177,50 @@ pub struct CacheAddr {
     pub index: usize,
     #[bits(12)]
     pub tag: u16,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cache::{
+        Cache,
+        CacheAddr,
+        CacheEntry,
+    };
+
+    #[test]
+    fn test_lookup() {
+        let mut cache = Cache::new();
+        let addr0 = CacheAddr::from(0x0);
+        let addr1 = CacheAddr::from(0x1);
+
+        assert!(cache.lookup(addr0).is_none());
+        assert!(cache.lookup(addr1).is_none());
+
+        cache.inner[addr0.index()][0] = Some(CacheEntry {
+            tag: addr0.tag(),
+            val: 0xDEAD,
+        });
+
+        let val0 = cache.lookup(addr0).unwrap();
+        assert_eq!(val0, 0xDEAD);
+
+        let val1 = cache.lookup(addr1).unwrap();
+        assert_eq!(val1, 0xDEAD);
+    }
+
+    #[test]
+    fn test_insert() {
+        let mut cache = Cache::new();
+        let addr0 = CacheAddr::from(0x0);
+
+        cache.insert(addr0, 0xDEAD);
+
+        assert_eq!(
+            cache.inner[addr0.offset()][0],
+            Some(CacheEntry {
+                tag: addr0.tag(),
+                val: 0xDEAD
+            })
+        );
+    }
 }

@@ -68,6 +68,9 @@ impl App {
 
         loop {
             terminal.draw(|frame| self.render_ui(frame))?;
+            self.cpu.cache.clear_highlights();
+            self.cpu.regs.clear_highlights();
+            self.dram_mirror.clear_highlights();
             self.handle_input()?;
             if self.cpu.execute().is_none() {
                 break;
