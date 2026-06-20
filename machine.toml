@@ -1,0 +1,5 @@
+[cycles]
+l1_cache_read = 3
+l1_cache_write = 3
+dram_read = 300
+dram_write = 300

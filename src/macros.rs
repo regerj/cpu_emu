@@ -1,6 +1,6 @@
 #[macro_export]
-macro_rules! aligned {
+macro_rules! cache_aligned {
     ($v:expr) => {
-        $v & !($crate::WORD::MAX << (1 * std::mem::size_of::<$crate::cache::CacheLine>() / 2))
+        $v & !($crate::cfg::Word::MAX << (1 * std::mem::size_of::<$crate::cfg::CacheLine>() / 2))
     };
 }

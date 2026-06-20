@@ -9,6 +9,11 @@ use ratatui::{
 };
 
 use crate::{
+    cfg::{
+        CONFIG,
+        CONST_CONFIG,
+        CacheLine,
+    },
     telemetry_init,
     telemetry_log,
     telemetry_module,
@@ -16,28 +21,21 @@ use crate::{
 
 telemetry_module!(cache);
 
-pub type CacheLine = u16;
-const WAYS: usize = 2;
-const SETS: usize = 8;
-
-/// The cache is a 1 level 2-way set associative cache.
-///
-/// It utilizes 2 byte cache line size and has a total capacity of 16 cache lines.
 #[derive(Debug)]
 pub struct Cache {
-    inner: [[Option<CacheEntry>; WAYS]; SETS],
+    inner: [[Option<CacheEntry>; CONST_CONFIG.cache.ways]; CONST_CONFIG.cache.sets],
 }
 
 impl Cache {
     pub fn new() -> Self {
         telemetry_init!();
         Self {
-            inner: [[None; WAYS]; SETS],
+            inner: [[None; CONST_CONFIG.cache.ways]; CONST_CONFIG.cache.sets],
         }
     }
 
     pub fn lookup(&self, addr: impl Into<CacheAddr>) -> Option<CacheLine> {
-        telemetry_log!(4);
+        telemetry_log!(CONFIG.cycles.l1_cache_read);
         let addr: CacheAddr = addr.into();
         self.inner[addr.index()].iter().find_map(|entry| {
             let entry = (*entry)?;
@@ -50,6 +48,7 @@ impl Cache {
     }
 
     pub fn insert(&mut self, addr: impl Into<CacheAddr>, value: CacheLine) {
+        telemetry_log!(CONFIG.cycles.l1_cache_write);
         let addr: CacheAddr = addr.into();
         let new_entry = CacheEntry {
             tag: addr.tag(),
@@ -123,7 +122,7 @@ impl Widget for &Cache {
 
 #[derive(Debug, Clone, Copy)]
 pub struct CacheEntry {
-    tag: u8,
+    tag: u16,
     val: CacheLine,
 }
 
@@ -133,12 +132,12 @@ impl Display for CacheEntry {
     }
 }
 
-#[bitfield(u8)]
+#[bitfield(u16)]
 pub struct CacheAddr {
     #[bits(1)]
     pub offset: usize,
     #[bits(3)]
     pub index: usize,
-    #[bits(4)]
-    pub tag: u8,
+    #[bits(12)]
+    pub tag: u16,
 }

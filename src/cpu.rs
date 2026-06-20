@@ -9,12 +9,14 @@ use std::{
 };
 
 use crate::{
-    WORD,
-    aligned,
     cache::{
         Cache,
         CacheAddr,
+    },
+    cache_aligned,
+    cfg::{
         CacheLine,
+        Word,
     },
     mem::MemoryController,
     ops::{
@@ -67,10 +69,10 @@ impl Widget for &Cpu {
 
 #[derive(Debug, Default)]
 pub struct Regs {
-    r0: WORD,
-    r1: WORD,
-    r2: WORD,
-    r3: WORD,
+    r0: Word,
+    r1: Word,
+    r2: Word,
+    r3: Word,
 }
 
 use ratatui::{
@@ -103,10 +105,10 @@ impl Widget for &Regs {
                 Style::default().add_modifier(Modifier::BOLD),
             )]),
             Line::from("────┼────────"),
-            Line::from(format!("R0  │ 0x{:02X}", self.r0)),
-            Line::from(format!("R1  │ 0x{:02X}", self.r1)),
-            Line::from(format!("R2  │ 0x{:02X}", self.r2)),
-            Line::from(format!("R3  │ 0x{:02X}", self.r3)),
+            Line::from(format!("R0  │ 0x{:04X}", self.r0)),
+            Line::from(format!("R1  │ 0x{:04X}", self.r1)),
+            Line::from(format!("R2  │ 0x{:04X}", self.r2)),
+            Line::from(format!("R3  │ 0x{:04X}", self.r3)),
         ];
 
         Paragraph::new(lines)
@@ -116,7 +118,7 @@ impl Widget for &Regs {
 }
 
 impl Index<usize> for Regs {
-    type Output = WORD;
+    type Output = Word;
     fn index(&self, index: usize) -> &Self::Output {
         match index {
             0 => &self.r0,
@@ -237,11 +239,11 @@ impl Cpu {
 
     /// Attempt to read the given address from the cache. Failing that, fallback to reading it from
     /// the memory controller.
-    fn read_addr(&mut self, addr: WORD) -> WORD {
+    fn read_addr(&mut self, addr: Word) -> Word {
         let cache_addr: CacheAddr = addr.into();
         let cache_line = self.read_cache_line(addr);
 
-        (cache_line >> (cache_addr.offset() * 8)) as WORD
+        (cache_line >> (cache_addr.offset() * 8)) as Word
     }
 
     fn read_cache_line(&mut self, addr: impl Into<CacheAddr>) -> CacheLine {
@@ -257,10 +259,10 @@ impl Cpu {
         cache_line
     }
 
-    fn write_addr(&mut self, addr: WORD, value: WORD) {
+    fn write_addr(&mut self, addr: Word, value: Word) {
         let cache_addr: CacheAddr = addr.into();
         let mut cache_line = self.read_cache_line(addr);
-        let zero_mask: CacheLine = !((WORD::MAX as CacheLine) << (cache_addr.offset() * 8));
+        let zero_mask: CacheLine = !((Word::MAX as CacheLine) << (cache_addr.offset() * 8));
         cache_line &= zero_mask;
 
         cache_line |= (value as CacheLine) << (cache_addr.offset() * 8);
@@ -269,11 +271,11 @@ impl Cpu {
     }
 
     /// Read an entire cache line from main memory
-    fn read_cache_line_from_mem(&self, addr: WORD) -> CacheLine {
+    fn read_cache_line_from_mem(&self, addr: Word) -> CacheLine {
         let mut cache_line: CacheLine = 0;
 
         for i in 0..std::mem::size_of::<CacheLine>() {
-            let byte = self.mc.read(aligned!(addr) + i as WORD);
+            let byte = self.mc.read(cache_aligned!(addr) + i as Word);
             cache_line |= (byte as CacheLine) << (8 * i);
         }
 

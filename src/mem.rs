@@ -10,8 +10,13 @@ use ratatui::{
 };
 
 use crate::{
-    WORD,
     block::Block,
+    cache_aligned,
+    cfg::{
+        CONFIG,
+        CacheLine,
+        Word,
+    },
     telemetry_init,
     telemetry_log,
     telemetry_module,
@@ -20,20 +25,20 @@ use crate::{
 telemetry_module!(dram);
 
 pub enum MemoryOps {
-    Read(WORD),
-    Write(WORD, WORD),
+    Read(Word),
+    Write(Word, Word),
     Kill,
 }
 
 #[derive(Debug)]
 pub struct MemoryController {
     tx: channel::Sender<MemoryOps>,
-    rx: channel::Receiver<Option<WORD>>,
+    rx: channel::Receiver<Option<Word>>,
 }
 
 impl MemoryController {
-    pub fn read(&self, address: WORD) -> WORD {
-        telemetry_log!(300);
+    pub fn read(&self, address: Word) -> Word {
+        telemetry_log!(CONFIG.cycles.dram_read);
         self.tx
             .send(MemoryOps::Read(address))
             .expect("Panic in memory fabric");
@@ -43,8 +48,8 @@ impl MemoryController {
             .expect("No response from memory fabric")
     }
 
-    pub fn write(&mut self, address: WORD, value: WORD) {
-        telemetry_log!(300);
+    pub fn write(&mut self, address: Word, value: Word) {
+        telemetry_log!(CONFIG.cycles.dram_write);
         self.tx
             .send(MemoryOps::Write(address, value))
             .expect("Panic in memory fabric");
@@ -66,7 +71,7 @@ impl MemoryController {
 #[derive(Debug)]
 pub struct Dram {
     inner: Vec<u8>,
-    tx: channel::Sender<Option<WORD>>,
+    tx: channel::Sender<Option<Word>>,
     rx: channel::Receiver<MemoryOps>,
     mirror: Option<channel::Sender<MemoryOps>>,
 }
@@ -82,7 +87,7 @@ impl Dram {
         };
         (
             Self {
-                inner: vec![0; WORD::MAX as usize + 1],
+                inner: vec![0; Word::MAX as usize + 1],
                 tx: resp_tx,
                 rx: op_rx,
                 mirror: None,
@@ -99,6 +104,27 @@ impl Dram {
             rx: mirror_rx,
         }
     }
+
+    fn read_byte(&self, addr: Word) -> u8 {
+        self.inner[addr as usize]
+    }
+
+    fn read_cache_line(&self, addr: Word) -> CacheLine {
+        let addr = cache_aligned!(addr);
+        let mut line = 0;
+
+        for i in 0..size_of::<CacheLine>() {
+            line |= (self.read_byte(addr + i as u16) as u16) << (i * 8);
+        }
+
+        line
+    }
+
+    fn write_cache_line(&mut self, addr: Word, val: CacheLine) {
+        for i in 0..size_of::<CacheLine>() {
+            self.inner[addr as usize + i] = ((val >> (i * 8)) & 0xFF) as u8;
+        }
+    }
 }
 
 impl Block for Dram {
@@ -108,11 +134,11 @@ impl Block for Dram {
             match op {
                 MemoryOps::Read(addr) => {
                     self.tx
-                        .send(Some(self.inner[addr as usize]))
+                        .send(Some(self.read_cache_line(addr)))
                         .expect("Panic in memory fabric");
                 }
                 MemoryOps::Write(addr, value) => {
-                    self.inner[addr as usize] = value;
+                    self.write_cache_line(addr, value);
                     self.tx.send(None).expect("Panic in memory fabric");
 
                     // Replicate our write op to the mirror
@@ -135,7 +161,9 @@ impl DramMirror {
     pub fn update(&mut self) {
         while let Ok(op) = self.rx.try_recv() {
             if let MemoryOps::Write(addr, value) = op {
-                self.inner[addr as usize] = value;
+                for i in 0..size_of::<CacheLine>() {
+                    self.inner[addr as usize + i] = ((value >> (i * 8)) & 0xFF) as u8;
+                }
             }
         }
     }

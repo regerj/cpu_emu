@@ -8,12 +8,16 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::Result;
+use anyhow::{
+    Result,
+    bail,
+};
 use ratatui::{
     Frame,
     crossterm::event::{
         self,
         Event,
+        KeyCode,
         KeyEvent,
     },
     layout::{
@@ -88,17 +92,22 @@ impl App {
 
     fn handle_input(&mut self) -> Result<()> {
         match event::read()? {
-            Event::Key(key_event) if key_event.kind.is_press() => {
-                self.handle_key_event(key_event)?;
+            // If we have a pressed key and it is unhandled (bad input), try again recursively
+            Event::Key(key_event)
+                if key_event.kind.is_press() && self.handle_key_event(key_event).is_err() =>
+            {
+                self.handle_input()?;
             }
             _ => {}
         }
+
         Ok(())
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<()> {
         match key_event.code {
-            _ => {}
+            KeyCode::Char('n') => {}
+            _ => bail!("Invalid keystroke"),
         }
         Ok(())
     }
