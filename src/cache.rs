@@ -17,20 +17,22 @@ use crate::{
 telemetry_module!(cache);
 
 pub type CacheLine = u16;
+const WAYS: usize = 2;
+const SETS: usize = 8;
 
 /// The cache is a 1 level 2-way set associative cache.
 ///
 /// It utilizes 2 byte cache line size and has a total capacity of 16 cache lines.
 #[derive(Debug)]
 pub struct Cache {
-    inner: [[Option<CacheEntry>; 2]; 8],
+    inner: [[Option<CacheEntry>; WAYS]; SETS],
 }
 
 impl Cache {
     pub fn new() -> Self {
         telemetry_init!();
         Self {
-            inner: [[None; 2]; 8],
+            inner: [[None; WAYS]; SETS],
         }
     }
 
