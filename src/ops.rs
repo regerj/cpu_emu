@@ -1,14 +1,11 @@
-use std::fmt::{
-    Display,
-    write,
-};
+use std::fmt::Display;
 
 use anyhow::{
     Context,
     bail,
 };
 
-use crate::WORD;
+use crate::cfg::Word;
 
 #[derive(Debug)]
 pub enum Operation {
@@ -86,7 +83,7 @@ impl TryFrom<&str> for Operation {
 #[derive(Debug)]
 pub struct Operand {
     pub ty: OperandInner,
-    pub word: WORD,
+    pub word: Word,
     pub deref: bool,
 }
 
@@ -127,7 +124,7 @@ impl TryFrom<&str> for Operand {
             OperandInner::Literal
         };
 
-        let val: WORD = iter
+        let val: Word = iter
             .collect::<String>()
             .parse()
             .context(format!("Invalid operand: {}", value))?;
