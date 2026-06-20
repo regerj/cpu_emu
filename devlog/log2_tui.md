@@ -43,3 +43,5 @@ This is not possible with regular Rust channels as they are designed for work di
 I am going to use a DRAM mirror. Yes we double the required memory to represent the machine memory, but we are in 8 bit and maybe soon 16 bit address space and I do not care. This makes the most sense to me, and its not even in the critical path of the CPU itself, its just for TUI.
 
 If/when I add a memory bus arbitration block, this may change.
+
+[Next DevLog](./log3_tui.md)
