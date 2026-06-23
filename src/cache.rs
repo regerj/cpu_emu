@@ -125,7 +125,7 @@ impl Widget for &Cache {
             let fmt = |e: Option<CacheEntry>| {
                 Span::from(
                     e.map(|e| format!("[{e}]"))
-                        .unwrap_or_else(|| "[----]".to_string()),
+                        .unwrap_or_else(|| "[----------]".to_string()),
                 )
             };
 

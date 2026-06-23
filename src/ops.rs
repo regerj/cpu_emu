@@ -120,50 +120,37 @@ impl TryFrom<&str> for Operand {
             false
         };
 
-        let constructor = if *iter.peek().context(format!("Invalid operand: {}", value))? == '$' {
+        let inner = if *iter.peek().context(format!("Invalid operand: {}", value))? == '$' {
             iter.next();
-            OperandInner::Register
+            let name = iter.collect::<String>();
+            OperandInner::Register(name)
         } else {
-            OperandInner::Literal
+            let val: Word = iter
+                .collect::<String>()
+                .parse()
+                .context(format!("Invalid operand: {}", value))?;
+            OperandInner::Literal(val)
         };
 
-        let val: Word = iter
-            .collect::<String>()
-            .parse()
-            .context(format!("Invalid operand: {}", value))?;
-
         Ok(if deref {
-            Self::LValue(constructor(val))
+            Self::LValue(inner)
         } else {
-            Self::RValue(constructor(val))
+            Self::RValue(inner)
         })
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub enum OperandInner {
-    Register(Word),
+    Register(String),
     Literal(Word),
-}
-
-impl OperandInner {
-    pub fn inner(&self) -> Word {
-        match self {
-            Self::Register(word) => *word,
-            Self::Literal(word) => *word,
-        }
-    }
 }
 
 impl Display for OperandInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let reg = match self {
-            Self::Register(..) => "$",
-            Self::Literal(..) => "",
-        };
-
-        let word = self.inner();
-
-        write!(f, "{reg}{word}")
+        match self {
+            Self::Register(name) => write!(f, "${name}"),
+            Self::Literal(val) => write!(f, "{val}"),
+        }
     }
 }
