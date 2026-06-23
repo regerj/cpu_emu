@@ -12,12 +12,10 @@ use crate::{
 
 mod app;
 mod block;
-mod cache;
 mod cfg;
 mod cpu;
 mod macros;
 mod mem;
-mod ops;
 mod telemetry;
 
 fn init_logging() -> Result<()> {

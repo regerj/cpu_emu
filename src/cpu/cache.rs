@@ -181,7 +181,7 @@ pub struct CacheAddr {
 
 #[cfg(test)]
 mod tests {
-    use crate::cache::{
+    use crate::cpu::cache::{
         Cache,
         CacheAddr,
         CacheEntry,
