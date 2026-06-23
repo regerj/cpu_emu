@@ -19,3 +19,6 @@ run:
 
 dbg:
     @rust-gdb --args cargo run -- ./test.bin
+
+test:
+    @cargo test

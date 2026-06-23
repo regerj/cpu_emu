@@ -5,6 +5,10 @@ use std::{
     sync::LazyLock,
 };
 
+use ratatui::style::{
+    Color,
+    Style,
+};
 use serde::{
     Deserialize,
     Serialize,
@@ -16,6 +20,9 @@ pub type CacheLine = u16;
 pub const CONST_CONFIG: CConfig = CConfig {
     cache: CacheCConfig { ways: 2, sets: 8 },
 };
+
+pub static CHANGE_STYLE: LazyLock<Style> =
+    LazyLock::new(|| Style::default().bg(Color::Cyan).fg(Color::DarkGray));
 
 pub struct CConfig {
     pub cache: CacheCConfig,
