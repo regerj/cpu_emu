@@ -1,6 +1,7 @@
 telemetry_module!(cpu);
 
 use std::{
+    collections::HashMap,
     ops::{
         Index,
         IndexMut,
@@ -73,57 +74,52 @@ impl Widget for &Cpu {
 
 #[derive(Debug)]
 pub struct Regs {
-    r0: Reg,
-    r1: Reg,
-    r2: Reg,
-    r3: Reg,
+    inner: HashMap<String, Reg>,
 }
 
 impl Regs {
     fn new() -> Self {
         Self {
-            r0: Reg::named("0"),
-            r1: Reg::named("1"),
-            r2: Reg::named("2"),
-            r3: Reg::named("3"),
+            inner: HashMap::from([
+                ("r0".to_string(), Reg::new()),
+                ("r1".to_string(), Reg::new()),
+                ("r2".to_string(), Reg::new()),
+                ("r3".to_string(), Reg::new()),
+            ]),
         }
     }
 
     pub fn clear_highlights(&mut self) {
-        self.r0.highlighted = false;
-        self.r1.highlighted = false;
-        self.r2.highlighted = false;
-        self.r3.highlighted = false;
+        self.inner
+            .values_mut()
+            .for_each(|reg| reg.highlighted = false);
     }
 }
 
 #[derive(Debug)]
 pub struct Reg {
-    name: String,
     val: Word,
     highlighted: bool,
 }
 
 impl Reg {
-    fn named(name: &str) -> Self {
+    fn new() -> Self {
         Self {
-            name: name.to_string(),
             val: 0,
             highlighted: false,
         }
     }
 }
 
-impl From<&Reg> for Line<'_> {
+impl From<&Reg> for Span<'_> {
     fn from(value: &Reg) -> Self {
-        let name = Span::from(format!("r{}", value.name));
-        let spacer = Span::from("  │ ");
-        let val = if value.highlighted {
+        // let name = Span::from(format!("r{}", value.name));
+        // let spacer = Span::from("  │ ");
+        if value.highlighted {
             Span::from(format!("0x{:04X}", value.val)).style(*CHANGE_STYLE)
         } else {
             Span::from(format!("0x{:04X}", value.val))
-        };
-        Line::from(vec![name, spacer, val])
+        }
     }
 }
 
@@ -151,17 +147,20 @@ use ratatui::{
 
 impl Widget for &Regs {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let lines = vec![
+        let mut lines = vec![
             Line::from(vec![Span::styled(
                 "Reg │ Value",
                 Style::default().add_modifier(Modifier::BOLD),
             )]),
             Line::from("────┼────────"),
-            (&self.r0).into(),
-            (&self.r1).into(),
-            (&self.r2).into(),
-            (&self.r3).into(),
         ];
+
+        for (name, reg) in self.inner.iter() {
+            let name = Span::from(format!("{}", name));
+            let spacer = Span::from("  │ ");
+            let reg: Span = reg.into();
+            lines.push(Line::from(vec![name, spacer, reg]));
+        }
 
         Paragraph::new(lines)
             .block(Block::bordered().title("Registers"))
@@ -169,40 +168,18 @@ impl Widget for &Regs {
     }
 }
 
-impl Index<usize> for Regs {
+impl Index<&str> for Regs {
     type Output = Word;
-    fn index(&self, index: usize) -> &Self::Output {
-        match index {
-            0 => &self.r0.val,
-            1 => &self.r1.val,
-            2 => &self.r2.val,
-            3 => &self.r3.val,
-            _ => panic!("Invalid register identifier"),
-        }
+    fn index(&self, index: &str) -> &Self::Output {
+        &self.inner.get(index).expect("No register by that name").val
     }
 }
 
-impl IndexMut<usize> for Regs {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        match index {
-            0 => {
-                self.r0.highlighted = true;
-                &mut self.r0.val
-            }
-            1 => {
-                self.r1.highlighted = true;
-                &mut self.r1.val
-            }
-            2 => {
-                self.r2.highlighted = true;
-                &mut self.r2.val
-            }
-            3 => {
-                self.r3.highlighted = true;
-                &mut self.r3.val
-            }
-            _ => panic!("Invalid register identifier"),
-        }
+impl IndexMut<&str> for Regs {
+    fn index_mut(&mut self, index: &str) -> &mut Self::Output {
+        let reg = self.inner.get_mut(index).expect("No register by that name");
+        reg.highlighted = true;
+        &mut reg.val
     }
 }
 
@@ -227,7 +204,7 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[name as usize],
+                            OperandInner::Register(name) => self.regs[&name],
                         };
 
                         assert!(is_word_aligned!(addr));
@@ -236,7 +213,7 @@ impl Cpu {
                     }
                     Operand::RValue(inner) => match inner {
                         OperandInner::Literal(word) => word,
-                        OperandInner::Register(name) => self.regs[name as usize],
+                        OperandInner::Register(name) => self.regs[&name],
                     },
                 };
 
@@ -244,7 +221,7 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[name as usize],
+                            OperandInner::Register(name) => self.regs[&name],
                         };
 
                         assert!(is_word_aligned!(addr));
@@ -253,8 +230,8 @@ impl Cpu {
 
                         self.write_addr(addr, dest_word + src_word);
                     }
-                    Operand::RValue(OperandInner::Register(reg)) => {
-                        self.regs[reg as usize] += src_word;
+                    Operand::RValue(OperandInner::Register(name)) => {
+                        self.regs[&name] += src_word;
                     }
                     Operand::RValue(OperandInner::Literal(..)) => {
                         panic!("RValue literals are not allowed as destinations")
@@ -266,7 +243,7 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[name as usize],
+                            OperandInner::Register(name) => self.regs[&name],
                         };
 
                         assert!(is_word_aligned!(addr));
@@ -275,7 +252,7 @@ impl Cpu {
                     }
                     Operand::RValue(inner) => match inner {
                         OperandInner::Literal(word) => word,
-                        OperandInner::Register(name) => self.regs[name as usize],
+                        OperandInner::Register(name) => self.regs[&name],
                     },
                 };
 
@@ -283,7 +260,7 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[name as usize],
+                            OperandInner::Register(name) => self.regs[&name],
                         };
 
                         assert!(is_word_aligned!(addr));
@@ -293,7 +270,7 @@ impl Cpu {
                         self.write_addr(addr, dest_word - src_word);
                     }
                     Operand::RValue(OperandInner::Register(reg)) => {
-                        self.regs[reg as usize] -= src_word;
+                        self.regs[&reg] -= src_word;
                     }
                     Operand::RValue(OperandInner::Literal(..)) => {
                         panic!("RValue literals are not allowed as destinations")
@@ -305,7 +282,7 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[name as usize],
+                            OperandInner::Register(name) => self.regs[&name],
                         };
 
                         assert!(is_word_aligned!(addr));
@@ -314,7 +291,7 @@ impl Cpu {
                     }
                     Operand::RValue(inner) => match inner {
                         OperandInner::Literal(word) => word,
-                        OperandInner::Register(name) => self.regs[name as usize],
+                        OperandInner::Register(name) => self.regs[&name],
                     },
                 };
 
@@ -322,15 +299,15 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[name as usize],
+                            OperandInner::Register(name) => self.regs[&name],
                         };
 
                         assert!(is_word_aligned!(addr));
 
                         self.write_addr(addr, src_word);
                     }
-                    Operand::RValue(OperandInner::Register(reg)) => {
-                        self.regs[reg as usize] = src_word;
+                    Operand::RValue(OperandInner::Register(name)) => {
+                        self.regs[&name] = src_word;
                     }
                     Operand::RValue(OperandInner::Literal(..)) => {
                         panic!("RValue literals are not allowed as destinations")
@@ -428,11 +405,13 @@ mod tests {
         },
     };
 
+    type CpuValidationFn = Box<dyn FnOnce(&mut Cpu)>;
+    type DramValidationFn = Box<dyn FnOnce(&MemoryController)>;
     struct CpuTester {
         op: Operation,
-        pre_validation: Option<Box<dyn FnOnce(&mut Cpu)>>,
-        post_validation: Option<Box<dyn FnOnce(&mut Cpu)>>,
-        dram_seeder: Option<Box<dyn FnOnce(&MemoryController)>>,
+        pre_validation: Option<CpuValidationFn>,
+        post_validation: Option<CpuValidationFn>,
+        dram_seeder: Option<DramValidationFn>,
     }
 
     impl CpuTester {
@@ -488,12 +467,12 @@ mod tests {
         }
     }
 
-    fn r(n: u16) -> Operand {
-        Operand::RValue(OperandInner::Register(n))
+    fn r(n: &str) -> Operand {
+        Operand::RValue(OperandInner::Register(n.to_string()))
     }
 
-    fn r_star(n: u16) -> Operand {
-        Operand::LValue(OperandInner::Register(n))
+    fn r_star(n: &str) -> Operand {
+        Operand::LValue(OperandInner::Register(n.to_string()))
     }
 
     fn lit(n: u16) -> Operand {
@@ -511,20 +490,20 @@ mod tests {
     #[test]
     fn test_add() {
         // Test adding lit to reg
-        CpuTester::new(add(r(0), lit(1)))
-            .with_post_validation(|cpu| assert_eq!(cpu.regs.r0.val, 1))
+        CpuTester::new(add(r("r0"), lit(1)))
+            .with_post_validation(|cpu| assert_eq!(cpu.regs["r0"], 1))
             .test();
         // Test adding reg to reg
-        CpuTester::new(add(r(0), r(1)))
+        CpuTester::new(add(r("r0"), r("r1")))
             .with_pre_validation(|cpu| {
-                cpu.regs.r0.val = 2;
-                cpu.regs.r1.val = 3;
+                cpu.regs["r0"] = 2;
+                cpu.regs["r1"] = 3;
             })
-            .with_post_validation(|cpu| assert_eq!(cpu.regs.r0.val, 5))
+            .with_post_validation(|cpu| assert_eq!(cpu.regs["r0"], 5))
             .test();
 
         // Test adding lit to *reg
-        CpuTester::new(add(r_star(0), lit(0xFF00))).with_post_validation(|cpu| {
+        CpuTester::new(add(r_star("r0"), lit(0xFF00))).with_post_validation(|cpu| {
             let entry = cpu.cache.lookup(0).expect("Cache entry not present");
             assert_eq!(entry, 0xFF00);
 
@@ -533,10 +512,10 @@ mod tests {
         });
 
         // Test adding reg to *reg
-        CpuTester::new(add(r_star(0), r(1)))
+        CpuTester::new(add(r_star("r0"), r("r1")))
             .with_dram_seeder(|mc| mc.write(0x00, 0xAD))
             .with_pre_validation(|cpu| {
-                cpu.regs.r1.val = 0xDE00;
+                cpu.regs["r1"] = 0xDE00;
             })
             .with_post_validation(|cpu| {
                 let entry = cpu.cache.lookup(0).expect("Cache entry not present");
@@ -558,10 +537,10 @@ mod tests {
             });
 
         // Test adding reg to *lit
-        CpuTester::new(add(lit_star(0x00), r(0)))
+        CpuTester::new(add(lit_star(0x00), r("r0")))
             .with_dram_seeder(|mc| mc.write(0x00, 0xAD))
             .with_pre_validation(|cpu| {
-                cpu.regs.r0.val = 0xDE00;
+                cpu.regs["r0"] = 0xDE00;
             })
             .with_post_validation(|cpu| {
                 let entry = cpu.cache.lookup(0).expect("Cache entry not present");
@@ -572,14 +551,14 @@ mod tests {
             });
 
         // Test adding *reg to *reg
-        CpuTester::new(add(r_star(0), r_star(1)))
+        CpuTester::new(add(r_star("r0"), r_star("r1")))
             .with_dram_seeder(|mc| {
                 mc.write(0x00, 0xAD);
                 mc.write(0x03, 0xDE);
             })
             .with_pre_validation(|cpu| {
-                cpu.regs.r0.val = 0x00;
-                cpu.regs.r1.val = 0x02;
+                cpu.regs["r0"] = 0x00;
+                cpu.regs["r1"] = 0x02;
             })
             .with_post_validation(|cpu| {
                 let entry = cpu.cache.lookup(0).expect("Cache entry not present");

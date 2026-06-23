@@ -4,7 +4,6 @@ use flexi_logger::{
     Logger,
     WriteMode,
 };
-use log::debug;
 
 use crate::{
     app::App,
