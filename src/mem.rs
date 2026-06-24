@@ -1,3 +1,4 @@
+use common::cfg::{CHANGE_STYLE, CONFIG, Word};
 use crossbeam::channel;
 use log::debug;
 use ratatui::{
@@ -16,11 +17,6 @@ use ratatui::{
 
 use crate::{
     block::Block,
-    cfg::{
-        CHANGE_STYLE,
-        CONFIG,
-        Word,
-    },
     telemetry_init,
     telemetry_log,
     telemetry_module,

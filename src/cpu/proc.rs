@@ -2,6 +2,7 @@ telemetry_module!(cpu);
 
 use std::vec::IntoIter;
 
+use common::{cfg::{CacheLine, Word}, ops::{Operand, OperandInner, Operation}};
 use ratatui::{
     buffer::Buffer,
     layout::{
@@ -20,19 +21,10 @@ use ratatui::{
 
 use crate::{
     cache_aligned,
-    cfg::{
-        CacheLine,
-        Word,
-    },
     cpu::{
-        Operation,
         cache::{
             Cache,
             CacheAddr,
-        },
-        ops::{
-            Operand,
-            OperandInner,
         },
         regs::Regs,
     },
@@ -291,15 +283,12 @@ impl Drop for Cpu {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    use common::ops::{Operand, OperandInner, Operation};
+
+use crate::{
         block::Block,
         cpu::{
             Cpu,
-            Operation,
-            ops::{
-                Operand,
-                OperandInner,
-            },
         },
         mem::{
             Dram,

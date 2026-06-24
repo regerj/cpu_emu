@@ -12,6 +12,7 @@ use anyhow::{
     Result,
     bail,
 };
+use common::ops::Operation;
 use ratatui::{
     Frame,
     crossterm::event::{
@@ -30,7 +31,6 @@ use crate::{
     block::Block,
     cpu::{
         Cpu,
-        Operation,
     },
     mem::{
         Dram,

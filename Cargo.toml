@@ -3,6 +3,14 @@ name = "arch_emu"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "compiler"
+path = "compiler/main.rs"
+
+[lib]
+name = "common"
+path = "common/lib.rs"
+
 [dependencies]
 anyhow = "1.0.102"
 bitfield-struct = "0.13.0"

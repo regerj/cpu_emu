@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use bitfield_struct::bitfield;
+use common::cfg::{CHANGE_STYLE, CONFIG, CONST_CONFIG, CacheLine};
 use rand::Rng;
 use ratatui::{
     buffer::Buffer,
@@ -9,12 +10,6 @@ use ratatui::{
 };
 
 use crate::{
-    cfg::{
-        CHANGE_STYLE,
-        CONFIG,
-        CONST_CONFIG,
-        CacheLine,
-    },
     telemetry_init,
     telemetry_log,
     telemetry_module,

@@ -6,6 +6,7 @@ use std::{
     },
 };
 
+use common::cfg::{CHANGE_STYLE, Word};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -22,11 +23,6 @@ use ratatui::{
         Paragraph,
         Widget,
     },
-};
-
-use crate::cfg::{
-    CHANGE_STYLE,
-    Word,
 };
 
 #[derive(Debug)]

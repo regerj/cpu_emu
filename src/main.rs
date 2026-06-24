@@ -12,7 +12,6 @@ use crate::{
 
 mod app;
 mod block;
-mod cfg;
 mod cpu;
 mod macros;
 mod mem;
