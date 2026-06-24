@@ -28,12 +28,14 @@ use ratatui::{
 
 use crate::{
     block::Block,
-    cpu::Cpu,
+    cpu::{
+        Cpu,
+        Operation,
+    },
     mem::{
         Dram,
         DramMirror,
     },
-    ops::Operation,
 };
 
 pub struct App {
