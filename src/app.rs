@@ -53,7 +53,14 @@ impl App {
 
         let instructions: Vec<Operation> = instructions
             .lines()
-            .map(|instruction| Operation::try_from(instruction?.as_str()))
+            .filter_map(|instruction| {
+                let instruction = instruction.ok()?;
+                if instruction.is_empty() || instruction.starts_with("//") {
+                    None
+                } else {
+                    Some(Operation::try_from(instruction.as_str()))
+                }
+            })
             .collect::<Result<Vec<Operation>, _>>()?;
 
         let (mut memory, mc) = Dram::new();

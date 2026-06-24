@@ -34,44 +34,50 @@ impl TryFrom<&str> for Operation {
             .context(format!("Invalid operation {}", value))?;
         match operation {
             "add" => {
-                let mut split_operands = operands.split(&[',', ' ']);
+                let mut split_operands = operands.split(',');
                 let op0 = Operand::try_from(
                     split_operands
                         .next()
-                        .context(format!("Invalid operands {}", operands))?,
+                        .context(format!("Invalid operands {}", operands))?
+                        .trim(),
                 )?;
                 let op1 = Operand::try_from(
                     split_operands
                         .next()
-                        .context(format!("Invalid operands {}", operands))?,
+                        .context(format!("Invalid operands {}", operands))?
+                        .trim(),
                 )?;
                 Ok(Self::Add(op0, op1))
             }
             "sub" => {
-                let mut split_operands = operands.split(&[',', ' ']);
+                let mut split_operands = operands.split(',');
                 let op0 = Operand::try_from(
                     split_operands
                         .next()
-                        .context(format!("Invalid operands {}", operands))?,
+                        .context(format!("Invalid operands {}", operands))?
+                        .trim(),
                 )?;
                 let op1 = Operand::try_from(
                     split_operands
                         .next()
-                        .context(format!("Invalid operands {}", operands))?,
+                        .context(format!("Invalid operands {}", operands))?
+                        .trim(),
                 )?;
                 Ok(Self::Sub(op0, op1))
             }
             "mov" => {
-                let mut split_operands = operands.split(&[',', ' ']);
+                let mut split_operands = operands.split(',');
                 let op0 = Operand::try_from(
                     split_operands
                         .next()
-                        .context(format!("Invalid operands {}", operands))?,
+                        .context(format!("Invalid operands {}", operands))?
+                        .trim(),
                 )?;
                 let op1 = Operand::try_from(
                     split_operands
                         .next()
-                        .context(format!("Invalid operands {}", operands))?,
+                        .context(format!("Invalid operands {}", operands))?
+                        .trim(),
                 )?;
                 Ok(Self::Mov(op0, op1))
             }

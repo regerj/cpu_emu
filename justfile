@@ -15,10 +15,10 @@ fmt:
     @cargo +nightly fmt
 
 run:
-    @cargo run -- ./test.bin
+    @cargo run -- ./test.basm
 
 dbg:
-    @rust-gdb --args cargo run -- ./test.bin
+    @rust-gdb --args cargo run -- ./test.basm
 
 test:
     @cargo test

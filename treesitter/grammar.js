@@ -4,11 +4,14 @@ module.exports = grammar({
   rules: {
     source_file: $ => repeat($.instruction),
 
-    instruction: $ => seq(
-      $.mnemonic,
-      optional($.operand),
-      ',',
-      optional($.operand),
+    instruction: $ => choice(
+      $.comment,
+      seq(
+        $.mnemonic,
+        optional($.operand),
+        ',',
+        optional($.operand),
+      ),
     ),
 
     mnemonic: $ => choice(
@@ -31,5 +34,9 @@ module.exports = grammar({
     ),
 
     immediate: $ => /\d+/,
+    comment: $ => seq(
+        '//',
+        /.*/,
+    )
   }
 });
