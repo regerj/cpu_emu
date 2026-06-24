@@ -4,5 +4,6 @@
 
 (immediate) @number
 
-(instruction
-  (identifier) @function)
+(instruction) @function
+
+(comment) @comment
