@@ -1,9 +1,6 @@
 use std::fmt::Display;
 
-use anyhow::{
-    Context,
-    bail,
-};
+use anyhow::{Context, bail};
 
 use crate::cfg::Word;
 
@@ -12,6 +9,12 @@ pub enum Operation {
     Add(Operand, Operand),
     Sub(Operand, Operand),
     Mov(Operand, Operand),
+}
+
+impl Operation {
+    pub fn compile(self) -> Vec<u8> {
+        unimplemented!()
+    }
 }
 
 impl Display for Operation {
@@ -129,7 +132,7 @@ impl TryFrom<&str> for Operand {
         let inner = if *iter.peek().context(format!("Invalid operand: {}", value))? == '$' {
             iter.next();
             let name = iter.collect::<String>();
-            OperandInner::Register(name)
+            OperandInner::Register(name.as_str().try_into()?)
         } else {
             let val: Word = iter
                 .collect::<String>()
@@ -148,7 +151,7 @@ impl TryFrom<&str> for Operand {
 
 #[derive(Debug, PartialEq)]
 pub enum OperandInner {
-    Register(String),
+    Register(Register),
     Literal(Word),
 }
 
@@ -158,5 +161,40 @@ impl Display for OperandInner {
             Self::Register(name) => write!(f, "${name}"),
             Self::Literal(val) => write!(f, "{val}"),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+#[repr(u8)]
+pub enum Register {
+    R0,
+    R1,
+    R2,
+    R3,
+}
+
+impl TryFrom<&str> for Register {
+    type Error = anyhow::Error;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "r0" => Ok(Self::R0),
+            "r1" => Ok(Self::R1),
+            "r2" => Ok(Self::R2),
+            "r3" => Ok(Self::R3),
+            _ => bail!("Invalid register"),
+        }
+    }
+}
+
+impl Display for Register {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::R0 => "r0",
+            Self::R1 => "r1",
+            Self::R2 => "r2",
+            Self::R3 => "r3",
+        };
+
+        write!(f, "{s}")
     }
 }
