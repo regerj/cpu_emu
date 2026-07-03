@@ -6,7 +6,10 @@ use std::{
     },
 };
 
-use common::cfg::{CHANGE_STYLE, Word};
+use common::cfg::{
+    CHANGE_STYLE,
+    Word,
+};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,

@@ -1,7 +1,12 @@
 use std::fmt::Display;
 
 use bitfield_struct::bitfield;
-use common::cfg::{CHANGE_STYLE, CONFIG, CONST_CONFIG, CacheLine};
+use common::cfg::{
+    CHANGE_STYLE,
+    CONFIG,
+    CONST_CONFIG,
+    CacheLine,
+};
 use rand::Rng;
 use ratatui::{
     buffer::Buffer,

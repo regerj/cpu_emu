@@ -1,2 +1,2 @@
-pub mod ops;
 pub mod cfg;
+pub mod isa;

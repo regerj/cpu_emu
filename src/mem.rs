@@ -1,4 +1,8 @@
-use common::cfg::{CHANGE_STYLE, CONFIG, Word};
+use common::cfg::{
+    CHANGE_STYLE,
+    CONFIG,
+    Word,
+};
 use crossbeam::channel;
 use log::debug;
 use ratatui::{

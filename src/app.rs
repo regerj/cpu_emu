@@ -29,9 +29,7 @@ use ratatui::{
 
 use crate::{
     block::Block,
-    cpu::{
-        Cpu,
-    },
+    cpu::Cpu,
     mem::{
         Dram,
         DramMirror,
