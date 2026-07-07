@@ -188,7 +188,7 @@ impl Display for OperandInner {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 #[repr(u8)]
 pub enum Register {
     R0,

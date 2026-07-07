@@ -10,9 +10,18 @@ enum Operation {
 struct Operand {
     deref: bool,
     reg: bool,
+    val: u16,
 }
 
 impl Operand {
+    pub fn new_reg(deref: bool, val: u8) -> Self {
+        Self { deref, reg: true, val: val as u16 }
+    }
+
+    pub fn new_lit(deref: bool, val: u16) -> Self {
+        Self { deref, reg: false, val }
+    }
+
     pub fn is_deref(&self) -> bool {
         self.deref
     }
@@ -22,11 +31,7 @@ impl Operand {
     }
 
     pub fn value_bytes(&self) -> Vec<u8> {
-        if self.is_reg() {
-            vec![64]
-        } else {
-            vec![13, 37]
-        }
+        self.val.to_le_bytes().to_vec()
     }
 }
 
@@ -37,28 +42,32 @@ fn test_derive_machine_code() {
         Operation::Add(
             Operand {
                 deref: false,
-                reg: true
+                reg: true,
+                val: 64,
             },
             Operand {
                 deref: true,
-                reg: false
+                reg: false,
+                val: 0x1337,
             }
         )
         .compile(),
-        vec![1, 6, 64, 13, 37]
+        vec![1, 6, 64, 0, 0x37, 0x13]
     );
     assert_eq!(
         Operation::Sub(
             Operand {
                 deref: true,
-                reg: true
+                reg: true,
+                val: 64,
             },
             Operand {
                 deref: true,
-                reg: false
+                reg: false,
+                val: 0x1337,
             }
         )
         .compile(),
-        vec![2, 7, 64, 13, 37]
+        vec![2, 7, 64, 0, 0x37, 0x13]
     );
 }

@@ -7,7 +7,7 @@ use common::{
         CacheLine,
         Word,
     },
-    ops::{
+    isa::{
         Operand,
         OperandInner,
         Operation,
@@ -106,7 +106,7 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[&name],
+                            OperandInner::Register(reg) => self.regs[reg],
                         };
 
                         assert!(is_word_aligned!(addr));
@@ -115,7 +115,7 @@ impl Cpu {
                     }
                     Operand::RValue(inner) => match inner {
                         OperandInner::Literal(word) => word,
-                        OperandInner::Register(name) => self.regs[&name],
+                        OperandInner::Register(reg) => self.regs[reg],
                     },
                 };
 
@@ -123,7 +123,7 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[&name],
+                            OperandInner::Register(reg) => self.regs[reg],
                         };
 
                         assert!(is_word_aligned!(addr));
@@ -132,8 +132,8 @@ impl Cpu {
 
                         self.write_addr(addr, dest_word + src_word);
                     }
-                    Operand::RValue(OperandInner::Register(name)) => {
-                        self.regs[&name] += src_word;
+                    Operand::RValue(OperandInner::Register(reg)) => {
+                        self.regs[reg] += src_word;
                     }
                     Operand::RValue(OperandInner::Literal(..)) => {
                         panic!("RValue literals are not allowed as destinations")
@@ -145,7 +145,7 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[&name],
+                            OperandInner::Register(reg) => self.regs[reg],
                         };
 
                         assert!(is_word_aligned!(addr));
@@ -154,7 +154,7 @@ impl Cpu {
                     }
                     Operand::RValue(inner) => match inner {
                         OperandInner::Literal(word) => word,
-                        OperandInner::Register(name) => self.regs[&name],
+                        OperandInner::Register(reg) => self.regs[reg],
                     },
                 };
 
@@ -162,7 +162,7 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[&name],
+                            OperandInner::Register(reg) => self.regs[reg],
                         };
 
                         assert!(is_word_aligned!(addr));
@@ -172,7 +172,7 @@ impl Cpu {
                         self.write_addr(addr, dest_word - src_word);
                     }
                     Operand::RValue(OperandInner::Register(reg)) => {
-                        self.regs[&reg] -= src_word;
+                        self.regs[reg] -= src_word;
                     }
                     Operand::RValue(OperandInner::Literal(..)) => {
                         panic!("RValue literals are not allowed as destinations")
@@ -184,7 +184,7 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[&name],
+                            OperandInner::Register(reg) => self.regs[reg],
                         };
 
                         assert!(is_word_aligned!(addr));
@@ -193,7 +193,7 @@ impl Cpu {
                     }
                     Operand::RValue(inner) => match inner {
                         OperandInner::Literal(word) => word,
-                        OperandInner::Register(name) => self.regs[&name],
+                        OperandInner::Register(reg) => self.regs[reg],
                     },
                 };
 
@@ -201,15 +201,15 @@ impl Cpu {
                     Operand::LValue(inner) => {
                         let addr = match inner {
                             OperandInner::Literal(word) => word,
-                            OperandInner::Register(name) => self.regs[&name],
+                            OperandInner::Register(reg) => self.regs[reg],
                         };
 
                         assert!(is_word_aligned!(addr));
 
                         self.write_addr(addr, src_word);
                     }
-                    Operand::RValue(OperandInner::Register(name)) => {
-                        self.regs[&name] = src_word;
+                    Operand::RValue(OperandInner::Register(reg)) => {
+                        self.regs[reg] = src_word;
                     }
                     Operand::RValue(OperandInner::Literal(..)) => {
                         panic!("RValue literals are not allowed as destinations")
@@ -293,10 +293,11 @@ impl Drop for Cpu {
 
 #[cfg(test)]
 mod tests {
-    use common::ops::{
+    use common::isa::{
         Operand,
         OperandInner,
         Operation,
+        Register,
     };
 
     use crate::{
@@ -371,11 +372,15 @@ mod tests {
     }
 
     fn r(n: &str) -> Operand {
-        Operand::RValue(OperandInner::Register(n.to_string()))
+        Operand::RValue(OperandInner::Register(
+            Register::try_from(n).expect("Bad register name"),
+        ))
     }
 
     fn r_star(n: &str) -> Operand {
-        Operand::LValue(OperandInner::Register(n.to_string()))
+        Operand::LValue(OperandInner::Register(
+            Register::try_from(n).expect("Bad register name"),
+        ))
     }
 
     fn lit(n: u16) -> Operand {
@@ -394,15 +399,15 @@ mod tests {
     fn test_add() {
         // Test adding lit to reg
         CpuTester::new(add(r("r0"), lit(1)))
-            .with_post_validation(|cpu| assert_eq!(cpu.regs["r0"], 1))
+            .with_post_validation(|cpu| assert_eq!(cpu.regs[Register::R0], 1))
             .test();
         // Test adding reg to reg
         CpuTester::new(add(r("r0"), r("r1")))
             .with_pre_validation(|cpu| {
-                cpu.regs["r0"] = 2;
-                cpu.regs["r1"] = 3;
+                cpu.regs[Register::R0] = 2;
+                cpu.regs[Register::R1] = 3;
             })
-            .with_post_validation(|cpu| assert_eq!(cpu.regs["r0"], 5))
+            .with_post_validation(|cpu| assert_eq!(cpu.regs[Register::R0], 5))
             .test();
 
         // Test adding lit to *reg
@@ -418,7 +423,7 @@ mod tests {
         CpuTester::new(add(r_star("r0"), r("r1")))
             .with_dram_seeder(|mc| mc.write(0x00, 0xAD))
             .with_pre_validation(|cpu| {
-                cpu.regs["r1"] = 0xDE00;
+                cpu.regs[Register::R1] = 0xDE00;
             })
             .with_post_validation(|cpu| {
                 let entry = cpu.cache.lookup(0).expect("Cache entry not present");
@@ -443,7 +448,7 @@ mod tests {
         CpuTester::new(add(lit_star(0x00), r("r0")))
             .with_dram_seeder(|mc| mc.write(0x00, 0xAD))
             .with_pre_validation(|cpu| {
-                cpu.regs["r0"] = 0xDE00;
+                cpu.regs[Register::R0] = 0xDE00;
             })
             .with_post_validation(|cpu| {
                 let entry = cpu.cache.lookup(0).expect("Cache entry not present");
@@ -460,8 +465,8 @@ mod tests {
                 mc.write(0x03, 0xDE);
             })
             .with_pre_validation(|cpu| {
-                cpu.regs["r0"] = 0x00;
-                cpu.regs["r1"] = 0x02;
+                cpu.regs[Register::R0] = 0x00;
+                cpu.regs[Register::R1] = 0x02;
             })
             .with_post_validation(|cpu| {
                 let entry = cpu.cache.lookup(0).expect("Cache entry not present");

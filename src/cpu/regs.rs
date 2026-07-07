@@ -6,10 +6,11 @@ use std::{
     },
 };
 
-use common::cfg::{
-    CHANGE_STYLE,
-    Word,
+use common::{
+    cfg::Word,
+    isa::Register,
 };
+
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -28,19 +29,21 @@ use ratatui::{
     },
 };
 
+use crate::CHANGE_STYLE;
+
 #[derive(Debug)]
 pub struct Regs {
-    inner: HashMap<String, Reg>,
+    inner: HashMap<Register, Reg>,
 }
 
 impl Regs {
     pub fn new() -> Self {
         Self {
             inner: HashMap::from([
-                ("r0".to_string(), Reg::new()),
-                ("r1".to_string(), Reg::new()),
-                ("r2".to_string(), Reg::new()),
-                ("r3".to_string(), Reg::new()),
+                (Register::R0, Reg::new()),
+                (Register::R1, Reg::new()),
+                (Register::R2, Reg::new()),
+                (Register::R3, Reg::new()),
             ]),
         }
     }
@@ -90,7 +93,7 @@ impl Widget for &Regs {
         ];
 
         for (name, reg) in self.inner.iter() {
-            let name = Span::from(name);
+            let name = Span::from(name.to_string());
             let spacer = Span::from("  │ ");
             let reg: Span = reg.into();
             lines.push(Line::from(vec![name, spacer, reg]));
@@ -102,16 +105,23 @@ impl Widget for &Regs {
     }
 }
 
-impl Index<&str> for Regs {
+impl Index<Register> for Regs {
     type Output = Word;
-    fn index(&self, index: &str) -> &Self::Output {
-        &self.inner.get(index).expect("No register by that name").val
+    fn index(&self, index: Register) -> &Self::Output {
+        &self
+            .inner
+            .get(&index)
+            .expect("No register by that name")
+            .val
     }
 }
 
-impl IndexMut<&str> for Regs {
-    fn index_mut(&mut self, index: &str) -> &mut Self::Output {
-        let reg = self.inner.get_mut(index).expect("No register by that name");
+impl IndexMut<Register> for Regs {
+    fn index_mut(&mut self, index: Register) -> &mut Self::Output {
+        let reg = self
+            .inner
+            .get_mut(&index)
+            .expect("No register by that name");
         reg.highlighted = true;
         &mut reg.val
     }

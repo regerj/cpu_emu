@@ -12,7 +12,8 @@ use anyhow::{
     Result,
     bail,
 };
-use common::ops::Operation;
+
+use common::isa::Operation;
 use ratatui::{
     Frame,
     crossterm::event::{

@@ -4,6 +4,7 @@ members = [
     "macros",
     "assembler",
     "common",
+    "disassembler",
 ]
 
 [package]
@@ -20,6 +21,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 anyhow = { workspace = true }
 bitfield-struct = { workspace = true }
 comfy-table = "7.2.2"
+common = { path = "common" }
 crossbeam = "0.8.4"
 flexi_logger = "0.31.9"
 log = "0.4.33"

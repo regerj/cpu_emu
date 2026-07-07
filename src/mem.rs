@@ -1,5 +1,4 @@
 use common::cfg::{
-    CHANGE_STYLE,
     CONFIG,
     Word,
 };
@@ -20,6 +19,7 @@ use ratatui::{
 };
 
 use crate::{
+    CHANGE_STYLE,
     block::Block,
     telemetry_init,
     telemetry_log,

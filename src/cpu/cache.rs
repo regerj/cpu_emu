@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 use bitfield_struct::bitfield;
 use common::cfg::{
-    CHANGE_STYLE,
     CONFIG,
     CONST_CONFIG,
     CacheLine,
@@ -15,6 +14,7 @@ use ratatui::{
 };
 
 use crate::{
+    CHANGE_STYLE,
     telemetry_init,
     telemetry_log,
     telemetry_module,

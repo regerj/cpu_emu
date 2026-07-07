@@ -11,12 +11,6 @@ pub enum Operation {
     Mov(Operand, Operand),
 }
 
-impl Operation {
-    pub fn compile(self) -> Vec<u8> {
-        unimplemented!()
-    }
-}
-
 impl Display for Operation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let instruction = match self {
