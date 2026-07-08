@@ -243,11 +243,13 @@ impl<'a> DirectDeriver<'a> {
         let compile_impl = self.derive_compile();
         let metadata_impl = self.derive_metadata();
         let constructor_impls = self.derive_constructors();
+        let consume_impl = self.derive_consume();
 
         parse_quote! {
             impl #ident {
                 #compile_impl
                 #metadata_impl
+                #consume_impl
                 #(#constructor_impls)*
             }
         }
@@ -307,6 +309,29 @@ impl<'a> DirectDeriver<'a> {
         }
 
         vec
+    }
+
+    fn derive_consume(&self) -> ImplItemFn {
+        let var_idents = self.item.variants.iter().map(|var| &var.ident);
+        let var_creators = self
+            .item
+            .variants
+            .iter()
+            .map(|var| format_ident!("create_{}", var.ident.to_string().to_lowercase()));
+        parse_quote! {
+            fn consume(bytes: &mut Iter<u8>) -> anyhow::Result<Option<Self>> {
+                let Some(mneumonic_byte) = bytes.next() else {
+                    return Ok(None);
+                };
+
+                let mneumonic = Mneumonics::try_from(*mneumonic_byte)?;
+
+                match mneumonic {
+                    #(Mneumonics::#var_idents => Self::#var_creators(bytes)),*
+                }
+                .map(Some)
+            }
+        }
     }
 
     fn derive_compile(&self) -> ImplItemFn {
