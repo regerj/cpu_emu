@@ -1,9 +1,8 @@
 use std::{
     fs::File,
     io::{
-        BufRead,
         BufReader,
-        Write,
+        Read,
     },
     path::PathBuf,
     str::FromStr,
@@ -19,24 +18,14 @@ fn main() {
     )
     .expect("Failed to parse argument as a path");
 
-    let reader = BufReader::new(File::open(path).expect("Could not open assembly file"));
+    let mut reader = BufReader::new(File::open(path).expect("Could not open binary file"));
 
-    let assembled: Vec<_> = reader
-        .lines()
-        .filter_map(|line| {
-            let line = line.expect("Failed to parse line of file");
-            if line.is_empty() || line.starts_with("//") {
-                None
-            } else {
-                Some(
-                    isa::Operation::try_from(line.as_str()).expect("Invalid operation encountered"),
-                )
-            }
-        })
-        .flat_map(isa::Operation::compile)
-        .collect();
+    let mut buf = Vec::new();
+    reader.read_to_end(&mut buf).expect("Could not read bytes");
 
-    let mut file = File::create("prog.sram").expect("Cannot create prog.sram file!");
-    file.write_all(&assembled)
-        .expect("Failed to write program to file");
+    let mut bytes = buf.iter();
+
+    while let Some(op) = isa::Operation::consume(&mut bytes).expect("Invalid binary") {
+        println!("{op}");
+    }
 }

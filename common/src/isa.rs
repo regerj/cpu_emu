@@ -187,7 +187,7 @@ pub enum OperandInner {
 impl OperandInner {
     fn value_bytes(&self) -> Vec<u8> {
         match self {
-            Self::Register(reg) => vec![*reg as u8],
+            Self::Register(reg) => vec![*reg as u8, 0],
             Self::Literal(word) => word.to_le_bytes().into(),
         }
     }
