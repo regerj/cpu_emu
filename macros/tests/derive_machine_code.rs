@@ -1,12 +1,52 @@
+use std::{
+    fs::File,
+    io::{
+        BufReader,
+        Bytes,
+    },
+    slice::Iter,
+};
+
+use anyhow::{
+    Context,
+    Result,
+};
 use macros::MachineCode;
 
-#[derive(MachineCode)]
+#[derive(MachineCode, PartialEq, Debug)]
 enum Operation {
     Foo,
     Add(Operand, Operand),
     Sub(Operand, Operand),
 }
 
+impl Operation {
+    fn consume(bytes: &mut Iter<u8>) -> Result<Option<Self>> {
+        let Some(mneumonic_byte) = bytes.next() else {
+            return Ok(None);
+        };
+
+        let mneumonic = Mneumonics::try_from(*mneumonic_byte)?;
+
+        match mneumonic {
+            Mneumonics::Foo => Self::create_foo(bytes),
+            Mneumonics::Add => Self::create_add(bytes),
+            Mneumonics::Sub => Self::create_sub(bytes),
+        }
+        .map(Some)
+    }
+}
+
+impl TryFrom<[u8; 6]> for Operation {
+    type Error = anyhow::Error;
+    fn try_from(value: [u8; 6]) -> Result<Self, Self::Error> {
+        let mneumonic = Mneumonics::try_from(value[0])?;
+        let meta = Metadata::from_bits(value[1]);
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, PartialEq)]
 struct Operand {
     deref: bool,
     reg: bool,
@@ -14,12 +54,8 @@ struct Operand {
 }
 
 impl Operand {
-    pub fn new_reg(deref: bool, val: u8) -> Self {
-        Self { deref, reg: true, val: val as u16 }
-    }
-
-    pub fn new_lit(deref: bool, val: u16) -> Self {
-        Self { deref, reg: false, val }
+    pub fn __create(reg: bool, deref: bool, val: u16) -> Self {
+        Self { deref, reg, val }
     }
 
     pub fn is_deref(&self) -> bool {
@@ -54,6 +90,25 @@ fn test_derive_machine_code() {
         .compile(),
         vec![1, 6, 64, 0, 0x37, 0x13]
     );
+
+    assert_eq!(
+        Operation::consume(&mut [1u8, 6u8, 64u8, 0u8, 0x37u8, 0x13u8].iter())
+            .unwrap()
+            .unwrap(),
+        Operation::Add(
+            Operand {
+                deref: false,
+                reg: true,
+                val: 64
+            },
+            Operand {
+                deref: true,
+                reg: false,
+                val: 0x1337
+            }
+        )
+    );
+
     assert_eq!(
         Operation::Sub(
             Operand {

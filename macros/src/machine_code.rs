@@ -242,11 +242,13 @@ impl<'a> DirectDeriver<'a> {
         let ident = self.item.ident.clone();
         let compile_impl = self.derive_compile();
         let metadata_impl = self.derive_metadata();
+        let constructor_impls = self.derive_constructors();
 
         parse_quote! {
             impl #ident {
                 #compile_impl
                 #metadata_impl
+                #(#constructor_impls)*
             }
         }
     }
@@ -265,6 +267,46 @@ impl<'a> DirectDeriver<'a> {
                 meta
             }
         }
+    }
+
+    fn derive_constructors(&self) -> Vec<ImplItemFn> {
+        let mut vec = vec![];
+
+        for variant in &self.item.variants {
+            let fn_ident = format_ident!("create_{}", variant.ident.to_string().to_lowercase());
+            let var_ident = &variant.ident;
+
+            let argi_lsb = (0..variant.fields.len()).map(|i| format_ident!("arg{i}_lsb"));
+            let argi_msb = (0..variant.fields.len()).map(|i| format_ident!("arg{i}_msb"));
+            let argi_val = (0..variant.fields.len()).map(|i| format_ident!("arg{i}_val"));
+            let argi_spec = (0..variant.fields.len()).map(|i| format_ident!("arg{i}_spec"));
+            let opi = (0..variant.fields.len())
+                .map(|i| format_ident!("op{i}"))
+                .collect::<Vec<_>>();
+
+            let instatiation_arg_tokens = if variant.fields.is_empty() {
+                quote! {}
+            } else {
+                quote! {(#(#opi),*)}
+            };
+
+            vec.push(parse_quote! {
+                fn #fn_ident(bytes: &mut Iter<u8>) -> anyhow::Result<Self> {
+                    let meta = Metadata::from_bits(*bytes.next().context("Invalid binary")?);
+
+                    #(
+                        let #argi_lsb = bytes.next().context("Invalid binary")?;
+                        let #argi_msb = bytes.next().context("Invalid binary")?;
+                        let #argi_val: u16 = (*#argi_lsb as u16) | ((*#argi_msb as u16) << 8);
+                        let #opi = Operand::__create(meta.#argi_spec().register(), meta.#argi_spec().deref(), #argi_val);
+                    )*
+
+                    Ok(Self::#var_ident #instatiation_arg_tokens)
+                }
+            });
+        }
+
+        vec
     }
 
     fn derive_compile(&self) -> ImplItemFn {
