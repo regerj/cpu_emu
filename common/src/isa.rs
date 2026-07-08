@@ -117,6 +117,20 @@ impl Operand {
             OperandInner::Literal(..) => false,
         }
     }
+
+    fn __create(reg: bool, deref: bool, val: u16) -> Self {
+        let inner = if reg {
+            OperandInner::Register(Register::try_from(val).unwrap())
+        } else {
+            OperandInner::Literal(val)
+        };
+
+        if deref {
+            Self::LValue(inner)
+        } else {
+            Self::RValue(inner)
+        }
+    }
 }
 
 impl Display for Operand {
@@ -195,6 +209,24 @@ pub enum Register {
     R1,
     R2,
     R3,
+}
+
+impl TryFrom<u16> for Register {
+    type Error = anyhow::Error;
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        const R0_PAT: u16 = Register::R0 as u16;
+        const R1_PAT: u16 = Register::R1 as u16;
+        const R2_PAT: u16 = Register::R2 as u16;
+        const R3_PAT: u16 = Register::R3 as u16;
+
+        Ok(match value {
+            R0_PAT => Self::R0,
+            R1_PAT => Self::R1,
+            R2_PAT => Self::R2,
+            R3_PAT => Self::R3,
+            _ => bail!("Invalid interpretation of integer to register"),
+        })
+    }
 }
 
 impl TryFrom<&str> for Register {

@@ -293,7 +293,7 @@ impl<'a> DirectDeriver<'a> {
             };
 
             vec.push(parse_quote! {
-                fn #fn_ident(bytes: &mut Iter<u8>) -> anyhow::Result<Self> {
+                fn #fn_ident(bytes: &mut std::slice::Iter<u8>) -> anyhow::Result<Self> {
                     let meta = Metadata::from_bits(*bytes.next().context("Invalid binary")?);
 
                     #(
@@ -319,7 +319,7 @@ impl<'a> DirectDeriver<'a> {
             .iter()
             .map(|var| format_ident!("create_{}", var.ident.to_string().to_lowercase()));
         parse_quote! {
-            fn consume(bytes: &mut Iter<u8>) -> anyhow::Result<Option<Self>> {
+            fn consume(bytes: &mut std::slice::Iter<u8>) -> anyhow::Result<Option<Self>> {
                 let Some(mneumonic_byte) = bytes.next() else {
                     return Ok(None);
                 };
