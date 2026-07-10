@@ -23,7 +23,7 @@ fn main() {
     let mut buf = Vec::new();
     reader.read_to_end(&mut buf).expect("Could not read bytes");
 
-    let mut bytes = buf.iter();
+    let mut bytes = buf.into_iter();
 
     while let Some(op) = isa::Operation::consume(&mut bytes).expect("Invalid binary") {
         println!("{op}");
