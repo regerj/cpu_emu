@@ -1,7 +1,5 @@
 telemetry_module!(cpu);
 
-use std::vec::IntoIter;
-
 use common::{
     cfg::{
         CacheLine,
@@ -11,6 +9,7 @@ use common::{
         Operand,
         OperandInner,
         Operation,
+        Register,
     },
 };
 use ratatui::{
@@ -39,19 +38,69 @@ use crate::{
         regs::Regs,
     },
     is_cache_aligned,
-    is_word_aligned,
-    mem::MemoryController,
+    mem::{
+        MemoryController,
+        Offset,
+        PhysAddr,
+    },
     telemetry_init,
     telemetry_log,
     telemetry_module,
 };
+
+/// A type that will iterate the physical address space for the given CPU.
+///
+/// It's iteration will begin at the current value of $IP and will increment $IP as it consumes
+/// bytes.
+///
+/// # Safety
+/// Because this iterator directly modifies $IP byte by byte, improper use can cause $IP to point to
+/// something other than an intended mneumonic byte. It mainly exists as a facilitator type for the
+/// `retrieve_next_instruction()` method on the `Cpu` directly. It generally should not be used
+/// directly.
+struct IpIter<'a> {
+    cpu: &'a mut Cpu,
+}
+
+impl Iterator for IpIter<'_> {
+    type Item = u8;
+    fn next(&mut self) -> Option<Self::Item> {
+        let byte = self
+            .cpu
+            .read_byte(PhysAddr::new(self.cpu.regs[Register::IP]));
+        self.cpu.regs[Register::IP] += 1;
+        Some(byte)
+    }
+}
+
+struct InertIpIter<'a> {
+    cpu: &'a Cpu,
+    ip: PhysAddr,
+}
+
+impl<'a> InertIpIter<'a> {
+    fn new(cpu: &'a Cpu) -> Self {
+        Self {
+            cpu,
+            ip: PhysAddr::new(cpu.regs[Register::IP]),
+        }
+    }
+}
+
+impl Iterator for InertIpIter<'_> {
+    type Item = u8;
+    fn next(&mut self) -> Option<Self::Item> {
+        let byte = self.cpu.sideband_read(self.ip);
+        self.ip += Offset::new(1);
+        Some(byte)
+    }
+}
 
 #[derive(Debug)]
 pub struct Cpu {
     pub regs: Regs,
     mc: MemoryController,
     pub cache: Cache,
-    instructions: IntoIter<Operation>,
 }
 
 impl Widget for &Cpu {
@@ -67,15 +116,20 @@ impl Widget for &Cpu {
             .split(upper_chunk);
         let (left_chunk, right_chunk) = (chunks[0], chunks[1]);
 
-        let mut iter = self.instructions.as_ref().iter();
+        let mut ip_iter = InertIpIter::new(self);
         let mut instructions = vec![];
-        if let Some(instruction) = iter.next() {
-            instructions.push(Line::from(instruction.to_string()).style(Style::default().bold()));
+        let mut i = 0;
+        while let Ok(Some(op)) = Operation::consume(&mut ip_iter)
+            && i < 5
+        {
+            let style = if i == 0 {
+                Style::default().bold()
+            } else {
+                Style::default().dim()
+            };
+            instructions.push(Line::from(op.to_string()).style(style));
+            i += 1;
         }
-
-        iter.for_each(|elem| {
-            instructions.push(Line::from(elem.to_string()).style(Style::default().dim()))
-        });
 
         Paragraph::new(instructions)
             .block(Block::bordered().title("Instructions"))
@@ -85,33 +139,36 @@ impl Widget for &Cpu {
     }
 }
 
-impl Cpu {
-    pub fn new(mc: MemoryController, instructions: IntoIter<Operation>) -> Self {
+impl<'a> Cpu {
+    pub fn new(mc: MemoryController) -> Self {
         telemetry_init!();
         Self {
             regs: Regs::new(),
             mc,
             cache: Cache::new(),
-            instructions,
         }
+    }
+
+    fn iter_mem(&'a mut self) -> IpIter<'a> {
+        IpIter { cpu: self }
     }
 
     pub fn execute(&mut self) -> Option<()> {
         telemetry_log!(1);
 
-        let instruction = self.instructions.next()?;
+        let instruction = self.retrieve_next_instruction();
         match instruction {
             Operation::Add(dest, src) => {
                 let src_word = match src {
                     Operand::LValue(inner) => {
                         let addr = match inner {
-                            OperandInner::Literal(word) => word,
-                            OperandInner::Register(reg) => self.regs[reg],
+                            OperandInner::Literal(word) => PhysAddr::new(word),
+                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
                         };
 
-                        assert!(is_word_aligned!(addr));
+                        assert!(addr.is_word_aligned());
 
-                        self.read_addr(addr)
+                        self.read_word(addr)
                     }
                     Operand::RValue(inner) => match inner {
                         OperandInner::Literal(word) => word,
@@ -122,13 +179,13 @@ impl Cpu {
                 match dest {
                     Operand::LValue(inner) => {
                         let addr = match inner {
-                            OperandInner::Literal(word) => word,
-                            OperandInner::Register(reg) => self.regs[reg],
+                            OperandInner::Literal(word) => PhysAddr::new(word),
+                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
                         };
 
-                        assert!(is_word_aligned!(addr));
+                        assert!(addr.is_word_aligned());
 
-                        let dest_word = self.read_addr(addr);
+                        let dest_word = self.read_word(addr);
 
                         self.write_addr(addr, dest_word + src_word);
                     }
@@ -144,13 +201,13 @@ impl Cpu {
                 let src_word = match src {
                     Operand::LValue(inner) => {
                         let addr = match inner {
-                            OperandInner::Literal(word) => word,
-                            OperandInner::Register(reg) => self.regs[reg],
+                            OperandInner::Literal(word) => PhysAddr::new(word),
+                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
                         };
 
-                        assert!(is_word_aligned!(addr));
+                        assert!(addr.is_word_aligned());
 
-                        self.read_addr(addr)
+                        self.read_word(addr)
                     }
                     Operand::RValue(inner) => match inner {
                         OperandInner::Literal(word) => word,
@@ -161,13 +218,13 @@ impl Cpu {
                 match dest {
                     Operand::LValue(inner) => {
                         let addr = match inner {
-                            OperandInner::Literal(word) => word,
-                            OperandInner::Register(reg) => self.regs[reg],
+                            OperandInner::Literal(word) => PhysAddr::new(word),
+                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
                         };
 
-                        assert!(is_word_aligned!(addr));
+                        assert!(addr.is_word_aligned());
 
-                        let dest_word = self.read_addr(addr);
+                        let dest_word = self.read_word(addr);
 
                         self.write_addr(addr, dest_word - src_word);
                     }
@@ -183,13 +240,13 @@ impl Cpu {
                 let src_word = match src {
                     Operand::LValue(inner) => {
                         let addr = match inner {
-                            OperandInner::Literal(word) => word,
-                            OperandInner::Register(reg) => self.regs[reg],
+                            OperandInner::Literal(word) => PhysAddr::new(word),
+                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
                         };
 
-                        assert!(is_word_aligned!(addr));
+                        assert!(addr.is_word_aligned());
 
-                        self.read_addr(addr)
+                        self.read_word(addr)
                     }
                     Operand::RValue(inner) => match inner {
                         OperandInner::Literal(word) => word,
@@ -200,11 +257,11 @@ impl Cpu {
                 match dest {
                     Operand::LValue(inner) => {
                         let addr = match inner {
-                            OperandInner::Literal(word) => word,
-                            OperandInner::Register(reg) => self.regs[reg],
+                            OperandInner::Literal(word) => PhysAddr::new(word),
+                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
                         };
 
-                        assert!(is_word_aligned!(addr));
+                        assert!(addr.is_word_aligned());
 
                         self.write_addr(addr, src_word);
                     }
@@ -221,12 +278,35 @@ impl Cpu {
         Some(())
     }
 
+    /// Read the next instruction from the address located in $IP.
+    ///
+    /// Increment the value of $IP by the appropriate number of bytes to point to the instruction
+    /// following the returned instruction.
+    fn retrieve_next_instruction(&mut self) -> Operation {
+        // We reinstantiate this iter each time in case instruction modified $IP (ex: jmp)
+        let mut iter = self.iter_mem();
+        Operation::consume(&mut iter)
+            .expect("Invalid machine code")
+            .expect("Unexpected end of instruction queue.")
+    }
+
+    /// Attempt to read the given address from the cache. Failing that, fallback to reading it from
+    /// the memory controller.
+    ///
+    /// Address need not be aligned.
+    fn read_byte(&mut self, addr: PhysAddr) -> u8 {
+        let cache_addr: CacheAddr = addr.into();
+        let cache_line = self.read_cache_line(addr);
+
+        (cache_line >> (cache_addr.offset() * 8)) as u8
+    }
+
     /// Attempt to read the given address from the cache. Failing that, fallback to reading it from
     /// the memory controller.
     ///
     /// Address must be word aligned.
-    fn read_addr(&mut self, addr: Word) -> Word {
-        assert!(is_word_aligned!(addr));
+    fn read_word(&mut self, addr: PhysAddr) -> Word {
+        assert!(addr.is_word_aligned());
         let cache_addr: CacheAddr = addr.into();
         let cache_line = self.read_cache_line(addr);
 
@@ -243,7 +323,8 @@ impl Cpu {
             return cache_entry;
         }
 
-        let cache_line = self.read_cache_line_from_mem(cache_aligned!(cache_addr.into_bits()));
+        let cache_line =
+            self.read_cache_line_from_mem(PhysAddr::new(cache_aligned!(cache_addr.into_bits())));
         // Our cpu can use cache line without rereading
         self.cache.insert(cache_addr, cache_line);
 
@@ -255,8 +336,8 @@ impl Cpu {
     /// Value *must* be able to fit within a single cache line.
     ///
     /// Address is not required to be cache aligned, but is required to be word aligned.
-    fn write_addr(&mut self, addr: Word, value: Word) {
-        assert!(is_word_aligned!(addr));
+    fn write_addr(&mut self, addr: PhysAddr, value: Word) {
+        assert!(addr.is_word_aligned());
         let cache_addr: CacheAddr = addr.into();
         let mut cache_line = self.read_cache_line(addr);
         let zero_mask: CacheLine = !((Word::MAX as CacheLine) << (cache_addr.offset() * 8));
@@ -267,21 +348,26 @@ impl Cpu {
         self.cache.insert(addr, cache_line);
         for i in 0..size_of::<Word>() {
             let byte: u8 = (value >> (8 * i)) as _;
-            self.mc.write(addr + i as Word, byte);
+            self.mc.write(addr + Offset::new(i as u16), byte);
         }
     }
 
     /// Read an entire cache line from main memory.
     ///
     /// Address must be cache aligned.
-    fn read_cache_line_from_mem(&self, addr: Word) -> CacheLine {
-        assert!(is_cache_aligned!(addr));
+    fn read_cache_line_from_mem(&self, addr: PhysAddr) -> CacheLine {
+        assert!(is_cache_aligned!(addr.into_raw()));
         let mut cache_line: CacheLine = 0;
         for i in 0..size_of::<CacheLine>() {
-            cache_line |= (self.mc.read(addr + i as Word) as CacheLine) << (8 * i);
+            cache_line |= (self.mc.read(addr + Offset::new(i as Word)) as CacheLine) << (8 * i);
         }
 
         cache_line
+    }
+
+    /// Read a byte from the given address without affecting the state of the CPU.
+    fn sideband_read(&self, addr: PhysAddr) -> u8 {
+        self.mc.read(addr)
     }
 }
 
@@ -306,11 +392,12 @@ mod tests {
         mem::{
             Dram,
             MemoryController,
+            PhysAddr,
         },
     };
 
     type CpuValidationFn = Box<dyn FnOnce(&mut Cpu)>;
-    type DramValidationFn = Box<dyn FnOnce(&MemoryController)>;
+    type DramValidationFn = Box<dyn FnOnce(&mut MemoryController)>;
     struct CpuTester {
         op: Operation,
         pre_validation: Option<CpuValidationFn>,
@@ -338,22 +425,24 @@ mod tests {
             self
         }
 
-        fn with_dram_seeder(mut self, f: impl FnOnce(&MemoryController) + 'static) -> Self {
+        fn with_dram_seeder(mut self, f: impl FnOnce(&mut MemoryController) + 'static) -> Self {
             self.dram_seeder = Some(Box::new(f));
             self
         }
 
         fn test(self) {
-            let (dram, mc) = Dram::new();
+            let (dram, dram_radio) = Dram::new();
+            let mut mem_ctrl = MemoryController::new();
+            mem_ctrl.reg_mem_ep(dram_radio);
 
             let dram_handle = std::thread::spawn(move || dram.dispatch());
 
             if let Some(seeder) = self.dram_seeder {
-                seeder(&mc);
+                seeder(&mut mem_ctrl);
             }
 
             // Test adding lit to register
-            let mut cpu = Cpu::new(mc, vec![self.op].into_iter());
+            let mut cpu = Cpu::new(mem_ctrl);
 
             if let Some(pre_validation) = self.pre_validation {
                 pre_validation(&mut cpu);
@@ -415,13 +504,13 @@ mod tests {
             let entry = cpu.cache.lookup(0).expect("Cache entry not present");
             assert_eq!(entry, 0xFF00);
 
-            assert_eq!(cpu.mc.read(0), 0);
-            assert_eq!(cpu.mc.read(1), 0xFF);
+            assert_eq!(cpu.mc.read(PhysAddr::new(0)), 0);
+            assert_eq!(cpu.mc.read(PhysAddr::new(1)), 0xFF);
         });
 
         // Test adding reg to *reg
         CpuTester::new(add(r_star("r0"), r("r1")))
-            .with_dram_seeder(|mc| mc.write(0x00, 0xAD))
+            .with_dram_seeder(|mc| mc.write(PhysAddr::new(0x00), 0xAD))
             .with_pre_validation(|cpu| {
                 cpu.regs[Register::R1] = 0xDE00;
             })
@@ -429,24 +518,24 @@ mod tests {
                 let entry = cpu.cache.lookup(0).expect("Cache entry not present");
                 assert_eq!(entry, 0xDEAD);
 
-                assert_eq!(cpu.mc.read(0), 0xAD);
-                assert_eq!(cpu.mc.read(1), 0xDE);
+                assert_eq!(cpu.mc.read(PhysAddr::new(0)), 0xAD);
+                assert_eq!(cpu.mc.read(PhysAddr::new(1)), 0xDE);
             });
 
         // Test adding lit to *lit
         CpuTester::new(add(lit_star(0x00), lit(0xDE00)))
-            .with_dram_seeder(|mc| mc.write(0x00, 0xAD))
+            .with_dram_seeder(|mc| mc.write(PhysAddr::new(0x00), 0xAD))
             .with_post_validation(|cpu| {
                 let entry = cpu.cache.lookup(0).expect("Cache entry not present");
                 assert_eq!(entry, 0xDEAD);
 
-                assert_eq!(cpu.mc.read(0), 0xAD);
-                assert_eq!(cpu.mc.read(1), 0xDE);
+                assert_eq!(cpu.mc.read(PhysAddr::new(0)), 0xAD);
+                assert_eq!(cpu.mc.read(PhysAddr::new(1)), 0xDE);
             });
 
         // Test adding reg to *lit
         CpuTester::new(add(lit_star(0x00), r("r0")))
-            .with_dram_seeder(|mc| mc.write(0x00, 0xAD))
+            .with_dram_seeder(|mc| mc.write(PhysAddr::new(0x00), 0xAD))
             .with_pre_validation(|cpu| {
                 cpu.regs[Register::R0] = 0xDE00;
             })
@@ -454,15 +543,15 @@ mod tests {
                 let entry = cpu.cache.lookup(0).expect("Cache entry not present");
                 assert_eq!(entry, 0xDEAD);
 
-                assert_eq!(cpu.mc.read(0), 0xAD);
-                assert_eq!(cpu.mc.read(1), 0xDE);
+                assert_eq!(cpu.mc.read(PhysAddr::new(0)), 0xAD);
+                assert_eq!(cpu.mc.read(PhysAddr::new(1)), 0xDE);
             });
 
         // Test adding *reg to *reg
         CpuTester::new(add(r_star("r0"), r_star("r1")))
             .with_dram_seeder(|mc| {
-                mc.write(0x00, 0xAD);
-                mc.write(0x03, 0xDE);
+                mc.write(PhysAddr::new(0x00), 0xAD);
+                mc.write(PhysAddr::new(0x03), 0xDE);
             })
             .with_pre_validation(|cpu| {
                 cpu.regs[Register::R0] = 0x00;
@@ -472,8 +561,8 @@ mod tests {
                 let entry = cpu.cache.lookup(0).expect("Cache entry not present");
                 assert_eq!(entry, 0xDEAD);
 
-                assert_eq!(cpu.mc.read(0), 0xAD);
-                assert_eq!(cpu.mc.read(1), 0xDE);
+                assert_eq!(cpu.mc.read(PhysAddr::new(0)), 0xAD);
+                assert_eq!(cpu.mc.read(PhysAddr::new(1)), 0xDE);
             });
     }
 }

@@ -12,10 +12,3 @@ macro_rules! is_cache_aligned {
             == 0
     };
 }
-
-#[macro_export]
-macro_rules! is_word_aligned {
-    ($v:expr) => {
-        $v & !(common::cfg::Word::MAX << (1 * std::mem::size_of::<common::cfg::Word>() / 2)) == 0
-    };
-}

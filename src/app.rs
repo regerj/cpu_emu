@@ -2,8 +2,8 @@ use std::{
     env,
     fs::File,
     io::{
-        BufRead,
         BufReader,
+        Read,
     },
     path::PathBuf,
 };
@@ -13,7 +13,6 @@ use anyhow::{
     bail,
 };
 
-use common::isa::Operation;
 use ratatui::{
     Frame,
     crossterm::event::{
@@ -34,6 +33,8 @@ use crate::{
     mem::{
         Dram,
         DramMirror,
+        MemoryController,
+        Sram,
     },
 };
 
@@ -45,25 +46,25 @@ pub struct App {
 impl App {
     pub fn new() -> Result<Self> {
         let args = env::args();
-        let instructions =
-            PathBuf::from(args.into_iter().nth(1).expect("No path to binary provided"));
-        let binary = File::open(&instructions).expect("Cannot find binary file");
-        let instructions = BufReader::new(binary);
+        let sram_path = PathBuf::from(args.into_iter().nth(1).expect("No path to binary provided"));
+        let sram_file = File::open(&sram_path).expect("Cannot find binary file");
+        let mut sram_bytes = Vec::new();
+        BufReader::new(sram_file).read_to_end(&mut sram_bytes)?;
 
-        let instructions: Vec<Operation> = instructions
-            .lines()
-            .filter_map(|instruction| {
-                let instruction = instruction.ok()?;
-                if instruction.is_empty() || instruction.starts_with("//") {
-                    None
-                } else {
-                    Some(Operation::try_from(instruction.as_str()))
-                }
-            })
-            .collect::<Result<Vec<Operation>, _>>()?;
+        // # Safety
+        // Safe to unwrap here beacuse we have just asserted and resized.
+        assert!(
+            sram_bytes.len() <= 0x0FFF,
+            "SRAM file is too long to fit in allocated address space"
+        );
+        sram_bytes.resize(0x0FFF, 0x6B);
+        let sram = Sram::new(sram_bytes.try_into().unwrap());
 
-        let (mut memory, mc) = Dram::new();
-        let cpu = Cpu::new(mc, instructions.into_iter());
+        let (mut memory, dram_radio) = Dram::new();
+        let mut mem_ctrl = MemoryController::new();
+        mem_ctrl.reg_mem_ep(dram_radio);
+        mem_ctrl.reg_mem_ep(sram);
+        let cpu = Cpu::new(mem_ctrl);
         let dram_mirror = memory.mirror();
 
         // Start our DRAM block

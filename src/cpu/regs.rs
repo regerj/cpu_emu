@@ -44,6 +44,7 @@ impl Regs {
                 (Register::R1, Reg::new()),
                 (Register::R2, Reg::new()),
                 (Register::R3, Reg::new()),
+                (Register::IP, Reg::new().with(0xF000)),
             ]),
         }
     }
@@ -62,11 +63,16 @@ pub struct Reg {
 }
 
 impl Reg {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             val: 0,
             highlighted: false,
         }
+    }
+
+    const fn with(mut self, val: Word) -> Self {
+        self.val = val;
+        self
     }
 }
 

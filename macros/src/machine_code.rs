@@ -293,13 +293,13 @@ impl<'a> DirectDeriver<'a> {
             };
 
             vec.push(parse_quote! {
-                fn #fn_ident(bytes: &mut std::slice::Iter<u8>) -> anyhow::Result<Self> {
-                    let meta = Metadata::from_bits(*bytes.next().context("Invalid binary")?);
+                fn #fn_ident(bytes: &mut impl Iterator<Item = u8>) -> anyhow::Result<Self> {
+                    let meta = Metadata::from_bits(bytes.next().context("Invalid binary")?);
 
                     #(
                         let #argi_lsb = bytes.next().context("Invalid binary")?;
                         let #argi_msb = bytes.next().context("Invalid binary")?;
-                        let #argi_val: u16 = (*#argi_lsb as u16) | ((*#argi_msb as u16) << 8);
+                        let #argi_val: u16 = (#argi_lsb as u16) | ((#argi_msb as u16) << 8);
                         let #opi = Operand::__create(meta.#argi_spec().register(), meta.#argi_spec().deref(), #argi_val);
                     )*
 
@@ -318,13 +318,14 @@ impl<'a> DirectDeriver<'a> {
             .variants
             .iter()
             .map(|var| format_ident!("create_{}", var.ident.to_string().to_lowercase()));
+
         parse_quote! {
-            pub fn consume(bytes: &mut std::slice::Iter<u8>) -> anyhow::Result<Option<Self>> {
+            pub fn consume(bytes: &mut impl Iterator<Item = u8>) -> anyhow::Result<Option<Self>> {
                 let Some(mneumonic_byte) = bytes.next() else {
                     return Ok(None);
                 };
 
-                let mneumonic = Mneumonics::try_from(*mneumonic_byte)?;
+                let mneumonic = Mneumonics::try_from(mneumonic_byte)?;
 
                 match mneumonic {
                     #(Mneumonics::#var_idents => Self::#var_creators(bytes)),*

@@ -205,10 +205,16 @@ impl Display for OperandInner {
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 #[repr(u8)]
 pub enum Register {
+    /// General Purpose Register 0
     R0,
+    /// General Purpose Register 1
     R1,
+    /// General Purpose Register 2
     R2,
+    /// General Purpose Register 3
     R3,
+    /// Instruction Pointer
+    IP,
 }
 
 impl TryFrom<u16> for Register {
@@ -249,6 +255,7 @@ impl Display for Register {
             Self::R1 => "r1",
             Self::R2 => "r2",
             Self::R3 => "r3",
+            Self::IP => "ip",
         };
 
         write!(f, "{s}")

@@ -12,8 +12,8 @@ fmt:
     @# We fmt with nightly because I like vertical import fmt which is unstable
     @cargo +nightly fmt
 
-run:
-    @cargo run -- ./test.basm
+run file:
+    @cargo run -- {{file}}
 
 dbg:
     @rust-gdb --args cargo run -- ./test.basm

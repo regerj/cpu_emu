@@ -15,6 +15,7 @@ use ratatui::{
 
 use crate::{
     CHANGE_STYLE,
+    mem::PhysAddr,
     telemetry_init,
     telemetry_log,
     telemetry_module,
@@ -177,6 +178,12 @@ pub struct CacheAddr {
     pub index: usize,
     #[bits(12)]
     pub tag: u16,
+}
+
+impl From<PhysAddr> for CacheAddr {
+    fn from(value: PhysAddr) -> Self {
+        Self(value.into_raw())
+    }
 }
 
 #[cfg(test)]
