@@ -7,7 +7,7 @@ use anyhow::{
 
 use crate::cfg::Word;
 
-#[derive(Debug)]
+#[derive(Debug, macros::MachineCode)]
 pub enum Operation {
     Add(Operand, Operand),
     Sub(Operand, Operand),
@@ -99,6 +99,38 @@ impl Operand {
             Self::RValue(inner) => inner,
         }
     }
+
+    fn value_bytes(&self) -> Vec<u8> {
+        self.inner().value_bytes()
+    }
+
+    fn is_deref(&self) -> bool {
+        match self {
+            Self::LValue(..) => true,
+            Self::RValue(..) => false,
+        }
+    }
+
+    fn is_reg(&self) -> bool {
+        match self.inner() {
+            OperandInner::Register(..) => true,
+            OperandInner::Literal(..) => false,
+        }
+    }
+
+    fn __create(reg: bool, deref: bool, val: u16) -> Self {
+        let inner = if reg {
+            OperandInner::Register(Register::try_from(val).unwrap())
+        } else {
+            OperandInner::Literal(val)
+        };
+
+        if deref {
+            Self::LValue(inner)
+        } else {
+            Self::RValue(inner)
+        }
+    }
 }
 
 impl Display for Operand {
@@ -129,7 +161,7 @@ impl TryFrom<&str> for Operand {
         let inner = if *iter.peek().context(format!("Invalid operand: {}", value))? == '$' {
             iter.next();
             let name = iter.collect::<String>();
-            OperandInner::Register(name)
+            OperandInner::Register(name.as_str().try_into()?)
         } else {
             let val: Word = iter
                 .collect::<String>()
@@ -148,8 +180,17 @@ impl TryFrom<&str> for Operand {
 
 #[derive(Debug, PartialEq)]
 pub enum OperandInner {
-    Register(String),
+    Register(Register),
     Literal(Word),
+}
+
+impl OperandInner {
+    fn value_bytes(&self) -> Vec<u8> {
+        match self {
+            Self::Register(reg) => vec![*reg as u8, 0],
+            Self::Literal(word) => word.to_le_bytes().into(),
+        }
+    }
 }
 
 impl Display for OperandInner {
@@ -158,5 +199,68 @@ impl Display for OperandInner {
             Self::Register(name) => write!(f, "${name}"),
             Self::Literal(val) => write!(f, "{val}"),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+#[repr(u8)]
+pub enum Register {
+    /// General Purpose Register 0
+    R0,
+    /// General Purpose Register 1
+    R1,
+    /// General Purpose Register 2
+    R2,
+    /// General Purpose Register 3
+    R3,
+    /// Instruction Pointer
+    IP,
+}
+
+impl TryFrom<u16> for Register {
+    type Error = anyhow::Error;
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        const R0_PAT: u16 = Register::R0 as u16;
+        const R1_PAT: u16 = Register::R1 as u16;
+        const R2_PAT: u16 = Register::R2 as u16;
+        const R3_PAT: u16 = Register::R3 as u16;
+        const IP_PAT: u16 = Register::IP as u16;
+
+        Ok(match value {
+            R0_PAT => Self::R0,
+            R1_PAT => Self::R1,
+            R2_PAT => Self::R2,
+            R3_PAT => Self::R3,
+            IP_PAT => Self::IP,
+            _ => bail!("Invalid interpretation of integer to register"),
+        })
+    }
+}
+
+impl TryFrom<&str> for Register {
+    type Error = anyhow::Error;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "r0" => Ok(Self::R0),
+            "r1" => Ok(Self::R1),
+            "r2" => Ok(Self::R2),
+            "r3" => Ok(Self::R3),
+            "ip" => Ok(Self::IP),
+            _ => bail!("Invalid interpretation of string to register"),
+        }
+    }
+}
+
+impl Display for Register {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::R0 => "r0",
+            Self::R1 => "r1",
+            Self::R2 => "r2",
+            Self::R3 => "r3",
+            Self::IP => "ip",
+        };
+
+        write!(f, "{s}")
     }
 }

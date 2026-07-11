@@ -1,6 +1,11 @@
 use std::fmt::Display;
 
 use bitfield_struct::bitfield;
+use common::cfg::{
+    CONFIG,
+    CONST_CONFIG,
+    CacheLine,
+};
 use rand::Rng;
 use ratatui::{
     buffer::Buffer,
@@ -9,12 +14,8 @@ use ratatui::{
 };
 
 use crate::{
-    cfg::{
-        CHANGE_STYLE,
-        CONFIG,
-        CONST_CONFIG,
-        CacheLine,
-    },
+    CHANGE_STYLE,
+    mem::PhysAddr,
     telemetry_init,
     telemetry_log,
     telemetry_module,
@@ -177,6 +178,12 @@ pub struct CacheAddr {
     pub index: usize,
     #[bits(12)]
     pub tag: u16,
+}
+
+impl From<PhysAddr> for CacheAddr {
+    fn from(value: PhysAddr) -> Self {
+        Self(value.into_raw())
+    }
 }
 
 #[cfg(test)]

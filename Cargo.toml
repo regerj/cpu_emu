@@ -1,19 +1,34 @@
+[workspace]
+resolver = "3"
+members = [
+    "macros",
+    "assembler",
+    "common",
+    "disassembler",
+]
+
 [package]
 name = "arch_emu"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.102"
 bitfield-struct = "0.13.0"
+serde = { version = "1.0.228", features = ["derive"] }
+
+[dependencies]
+anyhow = { workspace = true }
+bitfield-struct = { workspace = true }
 comfy-table = "7.2.2"
+common = { path = "common" }
 crossbeam = "0.8.4"
 flexi_logger = "0.31.9"
 log = "0.4.33"
 num-traits = "0.2.19"
 rand = "0.10.1"
 ratatui = "0.30.1"
-serde = { version = "1.0.228", features = ["derive"] }
+serde = { workspace = true }
 toml = "1.1.2"
 
 [features]

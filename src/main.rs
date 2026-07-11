@@ -1,8 +1,14 @@
+use std::sync::LazyLock;
+
 use anyhow::Result;
 use flexi_logger::{
     FileSpec,
     Logger,
     WriteMode,
+};
+use ratatui::style::{
+    Color,
+    Style,
 };
 
 use crate::{
@@ -12,11 +18,13 @@ use crate::{
 
 mod app;
 mod block;
-mod cfg;
 mod cpu;
 mod macros;
 mod mem;
 mod telemetry;
+
+pub static CHANGE_STYLE: LazyLock<Style> =
+    LazyLock::new(|| Style::default().bg(Color::Cyan).fg(Color::DarkGray));
 
 fn init_logging() -> Result<()> {
     let _logger = Logger::try_with_str("debug")?
