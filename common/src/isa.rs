@@ -224,12 +224,14 @@ impl TryFrom<u16> for Register {
         const R1_PAT: u16 = Register::R1 as u16;
         const R2_PAT: u16 = Register::R2 as u16;
         const R3_PAT: u16 = Register::R3 as u16;
+        const IP_PAT: u16 = Register::IP as u16;
 
         Ok(match value {
             R0_PAT => Self::R0,
             R1_PAT => Self::R1,
             R2_PAT => Self::R2,
             R3_PAT => Self::R3,
+            IP_PAT => Self::IP,
             _ => bail!("Invalid interpretation of integer to register"),
         })
     }
@@ -243,7 +245,8 @@ impl TryFrom<&str> for Register {
             "r1" => Ok(Self::R1),
             "r2" => Ok(Self::R2),
             "r3" => Ok(Self::R3),
-            _ => bail!("Invalid register"),
+            "ip" => Ok(Self::IP),
+            _ => bail!("Invalid interpretation of string to register"),
         }
     }
 }
