@@ -12,6 +12,7 @@ pub enum Operation {
     Add(Operand, Operand),
     Sub(Operand, Operand),
     Mov(Operand, Operand),
+    Jmp(Operand),
 }
 
 impl Display for Operation {
@@ -20,6 +21,7 @@ impl Display for Operation {
             Self::Add(op0, op1) => format!("add {op0},{op1}"),
             Self::Sub(op0, op1) => format!("sub {op0},{op1}"),
             Self::Mov(op0, op1) => format!("mov {op0},{op1}"),
+            Self::Jmp(op0) => format!("jmp {op0}"),
         };
         write!(f, "{instruction}")
     }
@@ -81,12 +83,16 @@ impl TryFrom<&str> for Operation {
                 )?;
                 Ok(Self::Mov(op0, op1))
             }
+            "jmp" => {
+                let op0 = Operand::try_from(operands)?;
+                Ok(Self::Jmp(op0))
+            }
             _ => bail!("Invalid operation: {value}"),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Operand {
     LValue(OperandInner),
     RValue(OperandInner),
@@ -178,7 +184,7 @@ impl TryFrom<&str> for Operand {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum OperandInner {
     Register(Register),
     Literal(Word),

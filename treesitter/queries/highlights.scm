@@ -7,3 +7,7 @@
 (instruction) @function
 
 (comment) @comment
+
+(label) @string.special
+
+(label_use) @string.special
