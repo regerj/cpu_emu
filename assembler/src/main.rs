@@ -7,7 +7,6 @@
 use std::{
     fs::File,
     io::{
-        BufRead,
         BufReader,
         Read,
         Write,
@@ -42,10 +41,8 @@ fn main() {
         .read_to_string(&mut s)
         .expect("Failed to read input file to string");
     let tokens = tokenize(s).unwrap();
-    println!("{tokens:#?}");
 
     let ops = parse(tokens);
-    println!("{ops:#?}");
 
     let assembled: Vec<_> = ops.into_iter().flat_map(isa::Operation::compile).collect();
 

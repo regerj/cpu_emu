@@ -39,7 +39,7 @@ fn evaluate_token_stack(stack: &mut Vec<Token>, symbol_table: &HashMap<String, W
                     Token::LabelInvoc(name) => {
                         let addr = symbol_table
                             .get(&name)
-                            .expect(&format!("Invalid label: {name}"));
+                            .unwrap_or_else(|| panic!("Invalid label: {name}"));
                         OperandInner::Literal(*addr as Word)
                     }
                     Token::Register(name) => OperandInner::Register(
@@ -95,8 +95,6 @@ pub fn parse(tokens: Vec<Token>) -> Vec<Operation> {
         }
         lc
     });
-
-    println!("Label Table: {label_table:#?}");
 
     // Second pass, perform actual parsing
     let mut stack = Vec::new();

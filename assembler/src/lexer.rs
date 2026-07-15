@@ -37,24 +37,25 @@ pub enum Token {
     Immediate(String),
     Mneumonic(String),
     Comma,
+    #[allow(unused)]
     Comment(String),
     Deref,
 }
 
 enum State {
-    BEGIN,
-    ARGS,
+    Begin,
+    Args,
 }
 
 pub fn tokenize(str: String) -> Result<Vec<Token>> {
     let mut chars = str.chars().peekable();
     let mut tokens = Vec::new();
-    let mut state = State::BEGIN;
+    let mut state = State::Begin;
 
     // Basic state machine
     while let Some(ch) = chars.peek() {
         match state {
-            State::BEGIN => {
+            State::Begin => {
                 // Newline no op
                 if *ch == '\n' {
                     chars.next().context("Unexpected end of input")?;
@@ -73,14 +74,14 @@ pub fn tokenize(str: String) -> Result<Vec<Token>> {
                         tokens.push(Token::LabelDecl(s[0..s.len() - 1].to_string()));
                     } else {
                         tokens.push(Token::Mneumonic(s));
-                        state = State::ARGS;
+                        state = State::Args;
                     }
                 }
             }
-            State::ARGS => {
+            State::Args => {
                 if *ch == '\n' {
                     chars.next().context("Unexpected end of input")?;
-                    state = State::BEGIN;
+                    state = State::Begin;
                 // Skip all spaces
                 } else if *ch == ' ' || *ch == '\t' {
                     chars.next().context("Unexpected end of input")?;
