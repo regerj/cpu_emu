@@ -11,7 +11,7 @@ enum Operation {
     Sub(Operand, Operand),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 struct Operand {
     deref: bool,
     reg: bool,
@@ -77,7 +77,7 @@ fn test_compile() {
 #[test]
 fn test_consume() {
     let bytes: [u8; _] = [1, 6, 64, 0, 0x37, 0x13, 2, 7, 64, 0, 0x37, 0x13];
-    let mut byte_iter = bytes.iter();
+    let mut byte_iter = bytes.into_iter();
 
     assert_eq!(
         Operation::consume(&mut byte_iter).unwrap().unwrap(),
@@ -110,4 +110,9 @@ fn test_consume() {
             }
         )
     );
+}
+
+#[test]
+fn test_num_bytes() {
+    assert_eq!(Mneumonics::Foo.num_bytes(), 2);
 }

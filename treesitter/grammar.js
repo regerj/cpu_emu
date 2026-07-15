@@ -18,6 +18,7 @@ module.exports = grammar({
       'mov',
       'add',
       'sub',
+      'jmp',
     ),
 
     operand: $ => seq(

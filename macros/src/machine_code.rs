@@ -89,7 +89,7 @@ impl<'a> MneumonicDeriver<'a> {
 
         parse_quote! {
             #[repr(u8)]
-            enum #ident {
+            pub enum #ident {
                 #(#mneumonics),*
             }
         }
@@ -121,6 +121,8 @@ impl<'a> MneumonicDeriver<'a> {
             .map(|variant| variant.ident.clone())
             .collect();
 
+        let str_idents: Vec<_> = self.item.variants.iter().map(|variant| variant.ident.to_string().to_lowercase()).collect();
+
         let direct_impl = parse_quote! {
             impl #self_ident {
                 #(const #pat_idents: u8 = Self::#idents as u8);*;
@@ -129,6 +131,11 @@ impl<'a> MneumonicDeriver<'a> {
                     match self {
                         #(Self::#idents => #num_args),*,
                     }
+                }
+
+                pub fn num_bytes(&self) -> usize {
+                    // 1 mneumonic + 1 meta + 2 / arg
+                    1 + 1 + 2 * self.num_args()
                 }
             }
         };
@@ -147,7 +154,22 @@ impl<'a> MneumonicDeriver<'a> {
             }
         };
 
-        vec![direct_impl, try_from_impl]
+        let try_from_str_impl = parse_quote! {
+            impl TryFrom<&str> for #self_ident {
+                type Error = anyhow::Error;
+
+                fn try_from(value: &str) -> Result<Self, Self::Error> {
+                    let ret = match value {
+                        #(#str_idents => Self::#idents),*,
+                        _ => anyhow::bail!("Invalid mneumonic"),
+                    };
+
+                    Ok(ret)
+                }
+            }
+        };
+
+        vec![direct_impl, try_from_impl, try_from_str_impl]
     }
 }
 
