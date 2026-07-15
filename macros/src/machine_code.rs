@@ -121,7 +121,12 @@ impl<'a> MneumonicDeriver<'a> {
             .map(|variant| variant.ident.clone())
             .collect();
 
-        let str_idents: Vec<_> = self.item.variants.iter().map(|variant| variant.ident.to_string().to_lowercase()).collect();
+        let str_idents: Vec<_> = self
+            .item
+            .variants
+            .iter()
+            .map(|variant| variant.ident.to_string().to_lowercase())
+            .collect();
 
         let direct_impl = parse_quote! {
             impl #self_ident {

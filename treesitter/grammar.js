@@ -2,7 +2,11 @@ module.exports = grammar({
   name: 'basm',
 
   rules: {
-    source_file: $ => repeat($.instruction),
+    source_file: $ => repeat(
+        choice($.instruction, $.label)
+    ),
+
+    label: $ => /\w+:/,
 
     instruction: $ => choice(
       $.comment,
@@ -26,6 +30,7 @@ module.exports = grammar({
       choice(
         $.register,
         $.immediate,
+        $.label_use,
       )
     ),
 
@@ -35,6 +40,9 @@ module.exports = grammar({
     ),
 
     immediate: $ => /\d+/,
+
+    label_use: $ => /[a-zA-Z_]\w*/,
+    
     comment: $ => seq(
         '//',
         /.*/,

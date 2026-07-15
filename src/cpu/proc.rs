@@ -284,12 +284,10 @@ impl<'a> Cpu {
                         assert!(addr.is_word_aligned());
                         PhysAddr::new(self.read_word(addr))
                     }
-                    Operand::RValue(inner) => {
-                        match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        }
-                    }
+                    Operand::RValue(inner) => match inner {
+                        OperandInner::Literal(word) => PhysAddr::new(word),
+                        OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
+                    },
                 };
 
                 self.regs[Register::IP] = addr.into_raw();

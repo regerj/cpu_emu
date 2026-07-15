@@ -5,14 +5,23 @@
 //! Second pass will perform assembly and replace labels with relative addresses.
 
 use std::{
-    fs::File, io::{
-        BufRead, BufReader, Read, Write
-    }, path::PathBuf, str::FromStr
+    fs::File,
+    io::{
+        BufRead,
+        BufReader,
+        Read,
+        Write,
+    },
+    path::PathBuf,
+    str::FromStr,
 };
 
 use common::isa;
 
-use crate::{lexer::tokenize, parser::parse};
+use crate::{
+    lexer::tokenize,
+    parser::parse,
+};
 
 mod lexer;
 mod parser;
@@ -29,27 +38,16 @@ fn main() {
     let mut reader = BufReader::new(&file);
 
     let mut s = String::new();
-    reader.read_to_string(&mut s).expect("Failed to read input file to string");
+    reader
+        .read_to_string(&mut s)
+        .expect("Failed to read input file to string");
     let tokens = tokenize(s).unwrap();
     println!("{tokens:#?}");
 
     let ops = parse(tokens);
     println!("{ops:#?}");
 
-    let assembled: Vec<_> = BufReader::new(file)
-        .lines()
-        .filter_map(|line| {
-            let line = line.expect("Failed to parse line of file");
-            if line.is_empty() || line.starts_with("//") {
-                None
-            } else {
-                Some(
-                    isa::Operation::try_from(line.as_str()).expect("Invalid operation encountered"),
-                )
-            }
-        })
-        .flat_map(isa::Operation::compile)
-        .collect();
+    let assembled: Vec<_> = ops.into_iter().flat_map(isa::Operation::compile).collect();
 
     let mut file = File::create("prog.sram").expect("Cannot create prog.sram file!");
     file.write_all(&assembled)

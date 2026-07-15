@@ -1,6 +1,13 @@
-use std::{iter::Peekable, str::Chars};
+use std::{
+    iter::Peekable,
+    str::Chars,
+};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{
+    Context,
+    Result,
+    bail,
+};
 
 trait PeekingCollectWhile: Iterator {
     fn collect_while(&mut self, p: impl FnMut(&Self::Item) -> bool) -> String;
@@ -87,15 +94,16 @@ pub fn tokenize(str: String) -> Result<Vec<Token>> {
                 // A $ means a register
                 } else if *ch == '$' {
                     chars.next().context("Unexpected end of input")?;
-                    tokens.push(Token::Register(chars.collect_while(|ch| ch.is_alphanumeric())));
+                    tokens.push(Token::Register(
+                        chars.collect_while(|ch| ch.is_alphanumeric()),
+                    ));
                 // A numeric means it must be an immediate
                 } else if ch.is_numeric() {
                     tokens.push(Token::Immediate(chars.collect_while(|ch| ch.is_numeric())));
                 } else if *ch == ',' {
                     chars.next().context("Unexpected end of input")?;
                     tokens.push(Token::Comma);
-                }
-                else {
+                } else {
                     bail!("Unexpected value while parsing for an argument: '{ch}'");
                 }
             }

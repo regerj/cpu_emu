@@ -1,6 +1,15 @@
 use std::collections::HashMap;
 
-use common::{cfg::Word, isa::{Mneumonics, Operand, OperandInner, Operation, Register}};
+use common::{
+    cfg::Word,
+    isa::{
+        Mneumonics,
+        Operand,
+        OperandInner,
+        Operation,
+        Register,
+    },
+};
 
 use crate::lexer::Token;
 
@@ -28,27 +37,29 @@ fn evaluate_token_stack(stack: &mut Vec<Token>, symbol_table: &HashMap<String, W
             Token::Deref => {
                 Operand::LValue(match tokens.next().expect("Unexpected end of tokens") {
                     Token::LabelInvoc(name) => {
-                        let addr = symbol_table.get(&name).expect(&format!("Invalid label: {name}"));
+                        let addr = symbol_table
+                            .get(&name)
+                            .expect(&format!("Invalid label: {name}"));
                         OperandInner::Literal(*addr as Word)
                     }
-                    Token::Register(name) => {
-                        OperandInner::Register(Register::try_from(name.as_str()).expect("Invalid register name"))
-                    }
+                    Token::Register(name) => OperandInner::Register(
+                        Register::try_from(name.as_str()).expect("Invalid register name"),
+                    ),
                     Token::Immediate(value) => {
                         OperandInner::Literal(value.parse().expect("Invalid immediate"))
                     }
                     _ => panic!("Unexpected token in stack"),
                 })
             }
-            Token::LabelInvoc(name) => {
-                Operand::RValue(OperandInner::Literal(*symbol_table.get(&name).expect("Invalid label")))
-            }
-            Token::Register(name) => {
-                Operand::RValue(OperandInner::Register(Register::try_from(name.as_str()).expect("Invalid register name")))
-            }
-            Token::Immediate(val) => {
-                Operand::RValue(OperandInner::Literal(val.parse().expect("Invalid immediate")))
-            }
+            Token::LabelInvoc(name) => Operand::RValue(OperandInner::Literal(
+                *symbol_table.get(&name).expect("Invalid label"),
+            )),
+            Token::Register(name) => Operand::RValue(OperandInner::Register(
+                Register::try_from(name.as_str()).expect("Invalid register name"),
+            )),
+            Token::Immediate(val) => Operand::RValue(OperandInner::Literal(
+                val.parse().expect("Invalid immediate"),
+            )),
             _ => panic!("Unexpected token in stack"),
         };
         args.push(arg);
@@ -71,7 +82,7 @@ pub fn parse(tokens: Vec<Token>) -> Vec<Operation> {
     let mut label_table: HashMap<String, u16> = HashMap::new();
 
     // First pass, construct label table, does not validate syntax at all
-    tokens.iter().fold(0, |mut lc, token| {
+    tokens.iter().fold(0xF000, |mut lc, token| {
         match token {
             Token::LabelDecl(name) => {
                 label_table.insert(name.clone(), lc);
@@ -85,42 +96,38 @@ pub fn parse(tokens: Vec<Token>) -> Vec<Operation> {
         lc
     });
 
+    println!("Label Table: {label_table:#?}");
+
     // Second pass, perform actual parsing
     let mut stack = Vec::new();
     let mut ret = Vec::new();
     for token in tokens {
         match stack.last() {
-            None => {
-                match token {
-                    Token::LabelDecl(_) | Token::Comment(_) => continue,
-                    Token::Mneumonic(_) => stack.push(token),
-                    _ => panic!("Invalid token at beginning of line"),
+            None => match token {
+                Token::LabelDecl(_) | Token::Comment(_) => continue,
+                Token::Mneumonic(_) => stack.push(token),
+                _ => panic!("Invalid token at beginning of line"),
+            },
+            Some(Token::Comma) => match token {
+                Token::Register(_) | Token::Immediate(_) | Token::LabelInvoc(_) | Token::Deref => {
+                    stack.push(token);
                 }
-            }
-            Some(Token::Comma) => {
-                match token {
-                    Token::Register(_) | Token::Immediate(_) | Token::LabelInvoc(_) | Token::Deref => {
-                        stack.push(token);
-                    }
-                    _ => panic!("Invalid token {token:?} following comma"),
+                _ => panic!("Invalid token {token:?} following comma"),
+            },
+            Some(Token::Mneumonic(_)) => match token {
+                Token::Register(_) | Token::Immediate(_) | Token::LabelInvoc(_) | Token::Deref => {
+                    stack.push(token);
                 }
-            }
-            Some(Token::Mneumonic(_)) => {
-                match token {
-                    Token::Register(_) | Token::Immediate(_) | Token::LabelInvoc(_) | Token::Deref => {
-                        stack.push(token);
-                    }
-                    Token::Mneumonic(_) => {
-                        ret.push(evaluate_token_stack(&mut stack, &label_table));
-                        stack.push(token);
-                    }
-                    Token::LabelDecl(_) => {
-                        ret.push(evaluate_token_stack(&mut stack, &label_table));
-                    }
-                    Token::Comment(_) => {}
-                    _ => panic!("Invalid token {token:?} following comma"),
+                Token::Mneumonic(_) => {
+                    ret.push(evaluate_token_stack(&mut stack, &label_table));
+                    stack.push(token);
                 }
-            }
+                Token::LabelDecl(_) => {
+                    ret.push(evaluate_token_stack(&mut stack, &label_table));
+                }
+                Token::Comment(_) => {}
+                _ => panic!("Invalid token {token:?} following comma"),
+            },
             Some(Token::Register(_)) | Some(Token::Immediate(_)) | Some(Token::LabelInvoc(_)) => {
                 match token {
                     Token::Comma => stack.push(token),
@@ -135,15 +142,17 @@ pub fn parse(tokens: Vec<Token>) -> Vec<Operation> {
                     _ => panic!("Invalid token {token:?} following comma"),
                 }
             }
-            Some(Token::Deref) => {
-                match token {
-                    Token::Register(_) | Token::Immediate(_) | Token::LabelInvoc(_) => stack.push(token),
-                    _ => panic!("Invalid token {token:?} following comma"),
+            Some(Token::Deref) => match token {
+                Token::Register(_) | Token::Immediate(_) | Token::LabelInvoc(_) => {
+                    stack.push(token)
                 }
-            }
+                _ => panic!("Invalid token {token:?} following comma"),
+            },
             _ => unimplemented!(),
         }
     }
+
+    ret.push(evaluate_token_stack(&mut stack, &label_table));
 
     ret
 }
