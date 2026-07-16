@@ -25,22 +25,9 @@ pub enum Operation {
     Psh(Operand),
     Pop(Operand),
     End,
+    Cal(Operand),
+    Ret,
 }
-
-// impl Display for Operation {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         let instruction = match self {
-//             Self::Add(op0, op1) => format!("add {op0},{op1}"),
-//             Self::Sub(op0, op1) => format!("sub {op0},{op1}"),
-//             Self::Mov(op0, op1) => format!("mov {op0},{op1}"),
-//             Self::Jmp(op0) => format!("jmp {op0}"),
-//             Self::Cmp(op0, op1) => format!("cmp {op0},{op1}"),
-//             Self::Jeq(op0) => format!("jeq {op0}"),
-//             Self::Jne(op0) => format!("jne {op0}"),
-//         };
-//         write!(f, "{instruction}")
-//     }
-// }
 
 impl TryFrom<&str> for Operation {
     type Error = anyhow::Error;
