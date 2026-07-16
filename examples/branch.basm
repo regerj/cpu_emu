@@ -10,3 +10,4 @@ EQUAL:
 mov $r2,0
 END:
 mov $r3,0
+end

@@ -61,7 +61,7 @@ pub trait MemoryFabricEndpoint {
     fn region(&self) -> MemoryRegion;
     fn read_byte(&self, addr: PhysAddr) -> u8;
     fn write_byte(&mut self, addr: PhysAddr, val: u8);
-    fn kill(self);
+    fn kill(&self);
 }
 
 #[derive(Clone, Copy)]
@@ -230,7 +230,9 @@ impl MemoryController {
     }
 
     pub fn kill(&self) {
-        unimplemented!()
+        for ep in &self.eps {
+            ep.kill();
+        }
     }
 }
 
@@ -268,7 +270,7 @@ impl MemoryFabricEndpoint for Sram {
         self.inner[Self::normalize_addr(addr).into_raw() as usize] = val;
     }
 
-    fn kill(self) {}
+    fn kill(&self) {}
 }
 
 pub struct DramRadio {
@@ -310,7 +312,7 @@ impl MemoryFabricEndpoint for DramRadio {
         assert!(self.rx.recv().expect("Panic in memory fabric").is_none());
     }
 
-    fn kill(self) {
+    fn kill(&self) {
         self.tx
             .send(MemoryOps::Kill)
             .expect("Panic in memory fabric");
@@ -386,7 +388,10 @@ impl Block for Dram {
                         mirror.send(op).expect("Panic in memory mirror");
                     }
                 }
-                MemoryOps::Kill => return,
+                MemoryOps::Kill => {
+                    self.tx.send(None).expect("Panic in memory fabric");
+                    return;
+                }
             }
         }
     }

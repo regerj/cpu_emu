@@ -28,6 +28,7 @@ module.exports = grammar({
       'jne',
       'psh',
       'pop',
+      'end',
     ),
 
     operand: $ => seq(

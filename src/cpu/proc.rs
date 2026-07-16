@@ -425,6 +425,9 @@ impl<'a> Cpu {
                     },
                 }
             }
+            Operation::End => {
+                return None;
+            }
         }
 
         Some(())
