@@ -6,6 +6,7 @@ use std::{
     },
 };
 
+use bitfield_struct::bitfield;
 use common::{
     cfg::Word,
     isa::Register,
@@ -31,6 +32,13 @@ use ratatui::{
 
 use crate::CHANGE_STYLE;
 
+#[bitfield(u16)]
+pub struct StatusRegister {
+    pub zero: bool,
+    #[bits(15)]
+    __: u16,
+}
+
 #[derive(Debug)]
 pub struct Regs {
     inner: HashMap<Register, Reg>,
@@ -45,6 +53,7 @@ impl Regs {
                 (Register::R2, Reg::new()),
                 (Register::R3, Reg::new()),
                 (Register::IP, Reg::new().with(0xF000)),
+                (Register::ST, Reg::new()),
             ]),
         }
     }

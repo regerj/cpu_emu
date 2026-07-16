@@ -23,6 +23,7 @@ module.exports = grammar({
       'add',
       'sub',
       'jmp',
+      'cmp',
     ),
 
     operand: $ => seq(
