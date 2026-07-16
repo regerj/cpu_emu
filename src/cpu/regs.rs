@@ -54,6 +54,8 @@ impl Regs {
                 (Register::R3, Reg::new()),
                 (Register::IP, Reg::new().with(0xF000)),
                 (Register::ST, Reg::new()),
+                (Register::SB, Reg::new().with(0x0100)),
+                (Register::SP, Reg::new().with(0x0100)),
             ]),
         }
     }

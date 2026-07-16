@@ -4,10 +4,16 @@ use anyhow::{
     Context,
     bail,
 };
+use macros::{
+    DisplayOp,
+    DisplayReg,
+    TryFromStr,
+    TryFromU16,
+};
 
 use crate::cfg::Word;
 
-#[derive(Debug, macros::MachineCode)]
+#[derive(Debug, DisplayOp, macros::MachineCode)]
 pub enum Operation {
     Add(Operand, Operand),
     Sub(Operand, Operand),
@@ -16,22 +22,24 @@ pub enum Operation {
     Cmp(Operand, Operand),
     Jeq(Operand),
     Jne(Operand),
+    Psh(Operand),
+    Pop(Operand),
 }
 
-impl Display for Operation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let instruction = match self {
-            Self::Add(op0, op1) => format!("add {op0},{op1}"),
-            Self::Sub(op0, op1) => format!("sub {op0},{op1}"),
-            Self::Mov(op0, op1) => format!("mov {op0},{op1}"),
-            Self::Jmp(op0) => format!("jmp {op0}"),
-            Self::Cmp(op0, op1) => format!("cmp {op0},{op1}"),
-            Self::Jeq(op0) => format!("jeq {op0}"),
-            Self::Jne(op0) => format!("jne {op0}"),
-        };
-        write!(f, "{instruction}")
-    }
-}
+// impl Display for Operation {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         let instruction = match self {
+//             Self::Add(op0, op1) => format!("add {op0},{op1}"),
+//             Self::Sub(op0, op1) => format!("sub {op0},{op1}"),
+//             Self::Mov(op0, op1) => format!("mov {op0},{op1}"),
+//             Self::Jmp(op0) => format!("jmp {op0}"),
+//             Self::Cmp(op0, op1) => format!("cmp {op0},{op1}"),
+//             Self::Jeq(op0) => format!("jeq {op0}"),
+//             Self::Jne(op0) => format!("jne {op0}"),
+//         };
+//         write!(f, "{instruction}")
+//     }
+// }
 
 impl TryFrom<&str> for Operation {
     type Error = anyhow::Error;
@@ -230,7 +238,7 @@ impl Display for OperandInner {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash, TryFromU16, TryFromStr, DisplayReg)]
 #[repr(u8)]
 pub enum Register {
     /// General Purpose Register 0
@@ -245,56 +253,8 @@ pub enum Register {
     IP,
     /// Status Register
     ST,
-}
-
-impl TryFrom<u16> for Register {
-    type Error = anyhow::Error;
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        const R0_PAT: u16 = Register::R0 as u16;
-        const R1_PAT: u16 = Register::R1 as u16;
-        const R2_PAT: u16 = Register::R2 as u16;
-        const R3_PAT: u16 = Register::R3 as u16;
-        const IP_PAT: u16 = Register::IP as u16;
-        const ST_PAT: u16 = Register::ST as u16;
-
-        Ok(match value {
-            R0_PAT => Self::R0,
-            R1_PAT => Self::R1,
-            R2_PAT => Self::R2,
-            R3_PAT => Self::R3,
-            IP_PAT => Self::IP,
-            ST_PAT => Self::ST,
-            _ => bail!("Invalid interpretation of integer to register"),
-        })
-    }
-}
-
-impl TryFrom<&str> for Register {
-    type Error = anyhow::Error;
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "r0" => Ok(Self::R0),
-            "r1" => Ok(Self::R1),
-            "r2" => Ok(Self::R2),
-            "r3" => Ok(Self::R3),
-            "ip" => Ok(Self::IP),
-            "st" => Ok(Self::ST),
-            _ => bail!("Invalid interpretation of string to register"),
-        }
-    }
-}
-
-impl Display for Register {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Self::R0 => "r0",
-            Self::R1 => "r1",
-            Self::R2 => "r2",
-            Self::R3 => "r3",
-            Self::IP => "ip",
-            Self::ST => "st",
-        };
-
-        write!(f, "{s}")
-    }
+    /// Stack base
+    SB,
+    /// Stack pointer
+    SP,
 }

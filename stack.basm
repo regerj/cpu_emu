@@ -1,0 +1,13 @@
+psh 0
+psh 1
+psh 2
+mov $r0,2
+pop $r1
+cmp $r0,$r1
+jeq EQ
+mov $r2,0
+jmp END
+EQ:
+mov $r2,1
+END:
+mov $r3,1

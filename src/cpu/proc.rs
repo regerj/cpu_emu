@@ -385,6 +385,46 @@ impl<'a> Cpu {
                     self.regs[Register::IP] = addr.into_raw();
                 }
             }
+            Operation::Psh(val) => {
+                let val = match val {
+                    Operand::LValue(inner) => {
+                        let addr = match inner {
+                            OperandInner::Literal(word) => PhysAddr::new(word),
+                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
+                        };
+
+                        assert!(addr.is_word_aligned());
+                        self.read_word(addr)
+                    }
+                    Operand::RValue(inner) => match inner {
+                        OperandInner::Literal(word) => word,
+                        OperandInner::Register(reg) => self.regs[reg],
+                    },
+                };
+
+                self.regs[Register::SP] -= size_of::<Word>() as Word;
+                self.write_addr(PhysAddr::from(self.regs[Register::SP]), val);
+            }
+            Operation::Pop(into) => {
+                let val = self.read_word(PhysAddr::from(self.regs[Register::SP]));
+                self.regs[Register::SP] += size_of::<Word>() as Word;
+
+                match into {
+                    Operand::LValue(inner) => {
+                        let addr = match inner {
+                            OperandInner::Literal(word) => PhysAddr::new(word),
+                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
+                        };
+
+                        assert!(addr.is_word_aligned());
+                        self.write_addr(addr, val);
+                    }
+                    Operand::RValue(inner) => match inner {
+                        OperandInner::Register(reg) => self.regs[reg] = val,
+                        OperandInner::Literal(_) => panic!("Cannot pop into immediate value"),
+                    },
+                }
+            }
         }
 
         Some(())
