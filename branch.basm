@@ -1,3 +1,12 @@
+// If the following two register are equal, r2 will contain 0.
+// Otherwise, it will contain 1.
 mov $r0,0
 mov $r1,4
 cmp $r0,$r1
+jeq EQUAL
+mov $r2,1
+jmp END
+EQUAL:
+mov $r2,0
+END:
+mov $r3,0

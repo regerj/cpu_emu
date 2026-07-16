@@ -79,3 +79,5 @@ We can then evaluate the stack we have built so far for mneumonic specific corre
 Then finally, the assembler can take our parsed AST and compile it using the macro generated code we worked on in the previous post!
 
 Et voila, we have a compiled binary that supports jumping and labels!
+
+[Next DevLog](./log6_conditionals.md)

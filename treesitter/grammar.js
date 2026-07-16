@@ -24,6 +24,8 @@ module.exports = grammar({
       'sub',
       'jmp',
       'cmp',
+      'jeq',
+      'jne',
     ),
 
     operand: $ => seq(

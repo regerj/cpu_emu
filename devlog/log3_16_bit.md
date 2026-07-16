@@ -24,4 +24,4 @@ The rest should kind of fall into place. Once we have this centralized configura
 
 The only other weak point is actually in the TUI / visualization implementations. Currently I am padding the registers and such with the appropriate number of zeroes for the word size. This is hard coded though because it is part of the format specifier. I need to look into whether or not this can be done differently. To be determined...
 
-[Next DevLog](TODO)
+[Next DevLog](./log4_sram.md)

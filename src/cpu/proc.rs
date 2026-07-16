@@ -189,11 +189,15 @@ impl<'a> Cpu {
                         assert!(addr.is_word_aligned());
 
                         let dest_word = self.read_word(addr);
+                        let result = dest_word + src_word;
 
-                        self.write_addr(addr, dest_word + src_word);
+                        self.write_addr(addr, result);
+                        self.set_status(&self.status().with_zero(result == 0));
                     }
                     Operand::RValue(OperandInner::Register(reg)) => {
-                        self.regs[reg] += src_word;
+                        let result = self.regs[reg] + src_word;
+                        self.regs[reg] = result;
+                        self.set_status(&self.status().with_zero(result == 0));
                     }
                     Operand::RValue(OperandInner::Literal(..)) => {
                         panic!("RValue literals are not allowed as destinations")
@@ -229,10 +233,15 @@ impl<'a> Cpu {
 
                         let dest_word = self.read_word(addr);
 
-                        self.write_addr(addr, dest_word - src_word);
+                        let result = dest_word - src_word;
+
+                        self.write_addr(addr, result);
+                        self.set_status(&self.status().with_zero(result == 0));
                     }
                     Operand::RValue(OperandInner::Register(reg)) => {
-                        self.regs[reg] -= src_word;
+                        let result = self.regs[reg] - src_word;
+                        self.regs[reg] = result;
+                        self.set_status(&self.status().with_zero(result == 0));
                     }
                     Operand::RValue(OperandInner::Literal(..)) => {
                         panic!("RValue literals are not allowed as destinations")
@@ -333,6 +342,48 @@ impl<'a> Cpu {
                 let mut status = self.status();
                 status.set_zero(op0_word == op1_word);
                 self.set_status(&status);
+            }
+            Operation::Jeq(dest) => {
+                let addr: PhysAddr = match dest {
+                    Operand::LValue(inner) => {
+                        let addr = match inner {
+                            OperandInner::Literal(word) => PhysAddr::new(word),
+                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
+                        };
+
+                        assert!(addr.is_word_aligned());
+                        PhysAddr::new(self.read_word(addr))
+                    }
+                    Operand::RValue(inner) => match inner {
+                        OperandInner::Literal(word) => PhysAddr::new(word),
+                        OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
+                    },
+                };
+
+                if self.status().zero() {
+                    self.regs[Register::IP] = addr.into_raw();
+                }
+            }
+            Operation::Jne(dest) => {
+                let addr: PhysAddr = match dest {
+                    Operand::LValue(inner) => {
+                        let addr = match inner {
+                            OperandInner::Literal(word) => PhysAddr::new(word),
+                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
+                        };
+
+                        assert!(addr.is_word_aligned());
+                        PhysAddr::new(self.read_word(addr))
+                    }
+                    Operand::RValue(inner) => match inner {
+                        OperandInner::Literal(word) => PhysAddr::new(word),
+                        OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
+                    },
+                };
+
+                if !self.status().zero() {
+                    self.regs[Register::IP] = addr.into_raw();
+                }
             }
         }
 

@@ -14,6 +14,8 @@ pub enum Operation {
     Mov(Operand, Operand),
     Jmp(Operand),
     Cmp(Operand, Operand),
+    Jeq(Operand),
+    Jne(Operand),
 }
 
 impl Display for Operation {
@@ -24,6 +26,8 @@ impl Display for Operation {
             Self::Mov(op0, op1) => format!("mov {op0},{op1}"),
             Self::Jmp(op0) => format!("jmp {op0}"),
             Self::Cmp(op0, op1) => format!("cmp {op0},{op1}"),
+            Self::Jeq(op0) => format!("jeq {op0}"),
+            Self::Jne(op0) => format!("jne {op0}"),
         };
         write!(f, "{instruction}")
     }
