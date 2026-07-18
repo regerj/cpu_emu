@@ -78,6 +78,12 @@ impl Offset {
     }
 }
 
+impl From<Word> for Offset {
+    fn from(value: Word) -> Self {
+        Self(value)
+    }
+}
+
 impl Display for Offset {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "0x{:04X}", self.0)

@@ -27,6 +27,7 @@ pub enum Operation {
     End,
     Cal(Operand),
     Ret,
+    Sys(Operand),
 }
 
 impl TryFrom<&str> for Operation {
@@ -121,6 +122,16 @@ impl Operand {
         match self {
             Self::LValue(inner) => inner,
             Self::RValue(inner) => inner,
+        }
+    }
+
+    pub fn is_immediate(&self) -> bool {
+        if let Self::RValue(inner) = self
+            && let OperandInner::Literal(_) = *inner
+        {
+            true
+        } else {
+            false
         }
     }
 
@@ -245,4 +256,6 @@ pub enum Register {
     SB,
     /// Stack pointer
     SP,
+    /// Interrupt table
+    IT,
 }

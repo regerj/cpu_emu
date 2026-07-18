@@ -1,5 +1,7 @@
 telemetry_module!(cpu);
 
+use std::ops::Add;
+
 use common::{
     cfg::{
         CacheLine,
@@ -162,310 +164,144 @@ impl<'a> Cpu {
         let instruction = self.retrieve_next_instruction();
         match instruction {
             Operation::Add(dest, src) => {
-                let src_word = match src {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
+                let src_word = self.get_raw_word(src);
 
-                        assert!(addr.is_word_aligned());
-
-                        self.read_word(addr)
-                    }
-                    Operand::RValue(inner) => match inner {
-                        OperandInner::Literal(word) => word,
-                        OperandInner::Register(reg) => self.regs[reg],
-                    },
-                };
-
-                match dest {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-
-                        let dest_word = self.read_word(addr);
-                        let result = dest_word + src_word;
-
-                        self.write_addr(addr, result);
-                        self.set_status(&self.status().with_zero(result == 0));
-                    }
-                    Operand::RValue(OperandInner::Register(reg)) => {
-                        let result = self.regs[reg] + src_word;
-                        self.regs[reg] = result;
-                        self.set_status(&self.status().with_zero(result == 0));
-                    }
-                    Operand::RValue(OperandInner::Literal(..)) => {
-                        panic!("RValue literals are not allowed as destinations")
-                    }
-                }
+                self.operate_on(dest, |d| *d += src_word);
             }
             Operation::Sub(dest, src) => {
-                let src_word = match src {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-
-                        self.read_word(addr)
-                    }
-                    Operand::RValue(inner) => match inner {
-                        OperandInner::Literal(word) => word,
-                        OperandInner::Register(reg) => self.regs[reg],
-                    },
-                };
-
-                match dest {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-
-                        let dest_word = self.read_word(addr);
-
-                        let result = dest_word - src_word;
-
-                        self.write_addr(addr, result);
-                        self.set_status(&self.status().with_zero(result == 0));
-                    }
-                    Operand::RValue(OperandInner::Register(reg)) => {
-                        let result = self.regs[reg] - src_word;
-                        self.regs[reg] = result;
-                        self.set_status(&self.status().with_zero(result == 0));
-                    }
-                    Operand::RValue(OperandInner::Literal(..)) => {
-                        panic!("RValue literals are not allowed as destinations")
-                    }
-                }
+                let src_word = self.get_raw_word(src);
+                self.operate_on(dest, |d| *d -= src_word);
             }
             Operation::Mov(dest, src) => {
-                let src_word = match src {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-
-                        self.read_word(addr)
-                    }
-                    Operand::RValue(inner) => match inner {
-                        OperandInner::Literal(word) => word,
-                        OperandInner::Register(reg) => self.regs[reg],
-                    },
-                };
-
-                match dest {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-
-                        self.write_addr(addr, src_word);
-                    }
-                    Operand::RValue(OperandInner::Register(reg)) => {
-                        self.regs[reg] = src_word;
-                    }
-                    Operand::RValue(OperandInner::Literal(..)) => {
-                        panic!("RValue literals are not allowed as destinations")
-                    }
-                }
+                let src_word = self.get_raw_word(src);
+                self.operate_on(dest, |d| *d = src_word);
             }
             Operation::Jmp(dest) => {
-                let addr: PhysAddr = match dest {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-                        PhysAddr::new(self.read_word(addr))
-                    }
-                    Operand::RValue(inner) => match inner {
-                        OperandInner::Literal(word) => PhysAddr::new(word),
-                        OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                    },
-                };
-
+                let addr = PhysAddr::from(self.get_raw_word(dest));
                 self.jump(addr);
             }
             Operation::Cmp(op0, op1) => {
-                let op0_word = match op0 {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
+                let op0_word = self.get_raw_word(op0);
 
-                        assert!(addr.is_word_aligned());
-
-                        self.read_word(addr)
-                    }
-                    Operand::RValue(inner) => match inner {
-                        OperandInner::Literal(word) => word,
-                        OperandInner::Register(reg) => self.regs[reg],
-                    },
-                };
-
-                let op1_word = match op1 {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-
-                        self.read_word(addr)
-                    }
-                    Operand::RValue(inner) => match inner {
-                        OperandInner::Literal(word) => word,
-                        OperandInner::Register(reg) => self.regs[reg],
-                    },
-                };
+                let op1_word = self.get_raw_word(op1);
 
                 let mut status = self.status();
                 status.set_zero(op0_word == op1_word);
                 self.set_status(&status);
             }
             Operation::Jeq(dest) => {
-                let addr: PhysAddr = match dest {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-                        PhysAddr::new(self.read_word(addr))
-                    }
-                    Operand::RValue(inner) => match inner {
-                        OperandInner::Literal(word) => PhysAddr::new(word),
-                        OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                    },
-                };
-
+                let addr = PhysAddr::from(self.get_raw_word(dest));
                 if self.status().zero() {
                     self.jump(addr);
                 }
             }
             Operation::Jne(dest) => {
-                let addr: PhysAddr = match dest {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-                        PhysAddr::new(self.read_word(addr))
-                    }
-                    Operand::RValue(inner) => match inner {
-                        OperandInner::Literal(word) => PhysAddr::new(word),
-                        OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                    },
-                };
-
+                let addr = PhysAddr::from(self.get_raw_word(dest));
                 if !self.status().zero() {
                     self.jump(addr);
                 }
             }
             Operation::Psh(val) => {
-                let val = match val {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-                        self.read_word(addr)
-                    }
-                    Operand::RValue(inner) => match inner {
-                        OperandInner::Literal(word) => word,
-                        OperandInner::Register(reg) => self.regs[reg],
-                    },
-                };
-
+                let val = self.get_raw_word(val);
                 self.push(val);
             }
             Operation::Pop(into) => {
                 let val = self.pop();
-
-                match into {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-                        self.write_addr(addr, val);
-                    }
-                    Operand::RValue(inner) => match inner {
-                        OperandInner::Register(reg) => self.regs[reg] = val,
-                        OperandInner::Literal(_) => panic!("Cannot pop into immediate value"),
-                    },
-                }
+                self.operate_on(into, |d| *d = val);
             }
             Operation::End => {
                 return None;
             }
             Operation::Cal(func) => {
-                let addr: PhysAddr = match func {
-                    Operand::LValue(inner) => {
-                        let addr = match inner {
-                            OperandInner::Literal(word) => PhysAddr::new(word),
-                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                        };
-
-                        assert!(addr.is_word_aligned());
-                        PhysAddr::new(self.read_word(addr))
-                    }
-                    Operand::RValue(inner) => match inner {
-                        OperandInner::Literal(word) => PhysAddr::new(word),
-                        OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
-                    },
-                };
-
-                // Push register frame
-                // self.push_regs();
-
-                // Need to push ret address
-                self.push(self.regs[Register::IP]);
-
-                // Reset stack
-                // self.regs[Register::SB] = self.regs[Register::SP];
-                self.jump(addr);
+                let addr = PhysAddr::from(self.get_raw_word(func));
+                self.call(addr);
             }
             Operation::Ret => {
                 let ret_addr = PhysAddr::from(self.pop());
                 // self.pop_regs();
                 self.jump(ret_addr);
             }
+            Operation::Sys(num) => {
+                let num = self.get_raw_word(num);
+                let base_addr = self.interrupt_table();
+                let f_ptr_addr = base_addr + Offset::from(num * size_of::<Word>() as Word);
+                let f_ptr = PhysAddr::from(self.read_word(f_ptr_addr));
+                self.call(f_ptr);
+            }
         }
 
         Some(())
     }
 
+    /// Call a function located at the given address.
+    fn call(&mut self, f_addr: PhysAddr) {
+        // Push register frame
+        self.push_regs();
+
+        // Need to push ret address
+        self.push(self.regs[Register::IP]);
+
+        // Reset stack
+        self.regs[Register::SB] = self.regs[Register::SP];
+        self.jump(f_addr);
+    }
+
     /// Get the current value of the status register.
     fn status(&self) -> StatusRegister {
         StatusRegister::from_bits(self.regs[Register::ST])
+    }
+
+    /// Translate an operand into a raw word.
+    fn get_raw_word(&mut self, op: Operand) -> Word {
+        match op {
+            Operand::LValue(inner) => {
+                let addr = match inner {
+                    OperandInner::Literal(word) => PhysAddr::new(word),
+                    OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
+                };
+
+                assert!(addr.is_word_aligned());
+
+                self.read_word(addr)
+            }
+            Operand::RValue(inner) => match inner {
+                OperandInner::Literal(word) => word,
+                OperandInner::Register(reg) => self.regs[reg],
+            },
+        }
+    }
+
+    /// Store a word into an operand.
+    ///
+    /// Panics in the case where the operand is an immediate value.
+    fn operate_on(&mut self, dest: Operand, f: impl FnOnce(&mut Word)) {
+        match dest {
+            Operand::LValue(inner) => {
+                let addr = match inner {
+                    OperandInner::Literal(word) => PhysAddr::new(word),
+                    OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
+                };
+
+                assert!(addr.is_word_aligned());
+
+                let mut dest_word = self.read_word(addr);
+
+                f(&mut dest_word);
+
+                self.write_addr(addr, dest_word);
+            }
+            Operand::RValue(OperandInner::Register(reg)) => {
+                f(&mut self.regs[reg]);
+            }
+            Operand::RValue(OperandInner::Literal(..)) => {
+                panic!("RValue literals are not allowed as destinations")
+            }
+        }
+    }
+
+    /// Get the current address of the interrupt descriptor table.
+    fn interrupt_table(&self) -> PhysAddr {
+        PhysAddr::from(self.regs[Register::IT])
     }
 
     /// Jump to the given address.
