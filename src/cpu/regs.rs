@@ -64,8 +64,12 @@ impl Regs {
     }
 
     pub fn clear_highlights(&mut self) {
-        self.gpr.values_mut().for_each(|reg| reg.highlighted = false);
-        self.cpu.values_mut().for_each(|reg| reg.highlighted = false);
+        self.gpr
+            .values_mut()
+            .for_each(|reg| reg.highlighted = false);
+        self.cpu
+            .values_mut()
+            .for_each(|reg| reg.highlighted = false);
     }
 }
 
