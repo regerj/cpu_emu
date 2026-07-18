@@ -440,7 +440,7 @@ impl<'a> Cpu {
 
     /// Read a byte from the given address without affecting the state of the CPU.
     fn sideband_read(&self, addr: PhysAddr) -> u8 {
-        self.mc.read(addr)
+        self.mc.sideband_read(addr)
     }
 }
 
