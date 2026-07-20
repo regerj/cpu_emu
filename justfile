@@ -2,6 +2,9 @@
 default:
     @just --list
 
+ts-update:
+    @cd treesitter && tree-sitter generate && tree-sitter build
+
 build:
     @cargo build --workspace
 

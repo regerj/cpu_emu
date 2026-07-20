@@ -159,3 +159,5 @@ The `write_byte()` method will write a single byte to any address (must be withi
 `kill()` is just a cleanup method.
 
 This defines the different things that the `MemoryController` may do with one of it's registered endpoints.
+
+[Next DevLog](./log5_jmp.md)

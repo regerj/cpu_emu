@@ -13,6 +13,9 @@ pub enum Operation {
     Sub(Operand, Operand),
     Mov(Operand, Operand),
     Jmp(Operand),
+    Cmp(Operand, Operand),
+    Jeq(Operand),
+    Jne(Operand),
 }
 
 impl Display for Operation {
@@ -22,6 +25,9 @@ impl Display for Operation {
             Self::Sub(op0, op1) => format!("sub {op0},{op1}"),
             Self::Mov(op0, op1) => format!("mov {op0},{op1}"),
             Self::Jmp(op0) => format!("jmp {op0}"),
+            Self::Cmp(op0, op1) => format!("cmp {op0},{op1}"),
+            Self::Jeq(op0) => format!("jeq {op0}"),
+            Self::Jne(op0) => format!("jne {op0}"),
         };
         write!(f, "{instruction}")
     }
@@ -86,6 +92,22 @@ impl TryFrom<&str> for Operation {
             "jmp" => {
                 let op0 = Operand::try_from(operands)?;
                 Ok(Self::Jmp(op0))
+            }
+            "cmp" => {
+                let mut split_operands = operands.split(',');
+                let op0 = Operand::try_from(
+                    split_operands
+                        .next()
+                        .context(format!("Invalid operands {}", operands))?
+                        .trim(),
+                )?;
+                let op1 = Operand::try_from(
+                    split_operands
+                        .next()
+                        .context(format!("Invalid operands {}", operands))?
+                        .trim(),
+                )?;
+                Ok(Self::Cmp(op0, op1))
             }
             _ => bail!("Invalid operation: {value}"),
         }
@@ -221,6 +243,8 @@ pub enum Register {
     R3,
     /// Instruction Pointer
     IP,
+    /// Status Register
+    ST,
 }
 
 impl TryFrom<u16> for Register {
@@ -231,6 +255,7 @@ impl TryFrom<u16> for Register {
         const R2_PAT: u16 = Register::R2 as u16;
         const R3_PAT: u16 = Register::R3 as u16;
         const IP_PAT: u16 = Register::IP as u16;
+        const ST_PAT: u16 = Register::ST as u16;
 
         Ok(match value {
             R0_PAT => Self::R0,
@@ -238,6 +263,7 @@ impl TryFrom<u16> for Register {
             R2_PAT => Self::R2,
             R3_PAT => Self::R3,
             IP_PAT => Self::IP,
+            ST_PAT => Self::ST,
             _ => bail!("Invalid interpretation of integer to register"),
         })
     }
@@ -252,6 +278,7 @@ impl TryFrom<&str> for Register {
             "r2" => Ok(Self::R2),
             "r3" => Ok(Self::R3),
             "ip" => Ok(Self::IP),
+            "st" => Ok(Self::ST),
             _ => bail!("Invalid interpretation of string to register"),
         }
     }
@@ -265,6 +292,7 @@ impl Display for Register {
             Self::R2 => "r2",
             Self::R3 => "r3",
             Self::IP => "ip",
+            Self::ST => "st",
         };
 
         write!(f, "{s}")
