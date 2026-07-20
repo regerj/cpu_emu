@@ -10,19 +10,35 @@ flowchart LR
         Core <--> mc[Memory Controller]
     end
     mc <-->|Memory Bus| DRAM
+    mc <-->|Memory Bus| SRAM
 ```
 
 ## Current Features
 
 - CPU
-- Rudimentary instruction set
+  - Cache
+  - Stack
+- Rudimentary ISA
   - add
   - sub
   - mov
+  - cmp
+  - jmp
+  - jeq
+  - jne
+  - psh
+  - pop
+  - end
+  - Labels
 - DRAM
+- SRAM
+- Assembler
+  - Tokenizer / Lexer
+  - Two-Pass Assembler
+- Disassembler
+- Basic Telemetry
 
 ## Planned Features
 
-- CPU Cache
 - Virtual Memory / MMU
-- Telemetry
+- Call/Ret

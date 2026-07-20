@@ -49,4 +49,4 @@ So, we will also add two new instructions, `psh` and `pop` that will push and po
 
 Finally, we will also throw together some basic procedural macros to lower the number of manual modification locations necessary to add new registers / instructions. You can read the diff for these, they are fairly basic.
 
-[Next DevLog](TODO)
+[Next DevLog](./log8_end.md)

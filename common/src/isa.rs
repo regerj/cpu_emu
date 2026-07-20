@@ -24,6 +24,7 @@ pub enum Operation {
     Jne(Operand),
     Psh(Operand),
     Pop(Operand),
+    End,
 }
 
 // impl Display for Operation {
