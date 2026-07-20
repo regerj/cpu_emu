@@ -55,4 +55,4 @@ packet
 1-15: "Reserved"
 ```
 
-[Next DevLog](TODO)
+[Next DevLog](./log7_the_stack.md)
