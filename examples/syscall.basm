@@ -4,8 +4,8 @@ mov *0,SYSCALL_0
 mov *2,SYSCALL_1
 mov $it,0
 
-sys 0
-sys 1
+int 0
+int 1
 end
 
 SYSCALL_0:

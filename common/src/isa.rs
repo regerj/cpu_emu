@@ -27,7 +27,7 @@ pub enum Operation {
     End,
     Cal(Operand),
     Ret,
-    Sys(Operand),
+    Int(Operand),
 }
 
 impl TryFrom<&str> for Operation {

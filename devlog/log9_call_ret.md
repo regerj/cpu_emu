@@ -134,4 +134,4 @@ So to cap off, `jmp` and `cal`/`ret` can absolutely coexist, they do and they sh
 
 `cal`/`ret` is useful for mimicking function calls in C.
 
-[Next DevLog](TODO)
+[Next DevLog](./log10_syscall.md)

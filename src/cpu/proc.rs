@@ -1,7 +1,5 @@
 telemetry_module!(cpu);
 
-use std::ops::Add;
-
 use common::{
     cfg::{
         CacheLine,
@@ -221,7 +219,7 @@ impl<'a> Cpu {
                 // self.pop_regs();
                 self.jump(ret_addr);
             }
-            Operation::Sys(num) => {
+            Operation::Int(num) => {
                 let num = self.get_raw_word(num);
                 let base_addr = self.interrupt_table();
                 let f_ptr_addr = base_addr + Offset::from(num * size_of::<Word>() as Word);
