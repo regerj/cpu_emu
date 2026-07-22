@@ -4,4 +4,4 @@ This will be a short one. There was a "bug" previously because after finishing t
 
 To prevent this, we will just add an `end` instruction that indicates to the CPU to end execution. This will allow for a clean shutdown and cleanup of the CPU and hardware.
 
-[Next DevLog](TODO)
+[Next DevLog](./log9_call_ret.md)

@@ -444,18 +444,18 @@ impl<'a> Cpu {
                 };
 
                 // Push register frame
-                self.push_regs();
+                // self.push_regs();
 
                 // Need to push ret address
                 self.push(self.regs[Register::IP]);
 
                 // Reset stack
-                self.regs[Register::SB] = self.regs[Register::SP];
+                // self.regs[Register::SB] = self.regs[Register::SP];
                 self.jump(addr);
             }
             Operation::Ret => {
                 let ret_addr = PhysAddr::from(self.pop());
-                self.pop_regs();
+                // self.pop_regs();
                 self.jump(ret_addr);
             }
         }
@@ -493,14 +493,14 @@ impl<'a> Cpu {
 
     /// Pop a register frame off of the stack.
     fn pop_regs(&mut self) {
-        self.push(self.regs[Register::IP]);
-        self.push(self.regs[Register::ST]);
-        self.push(self.regs[Register::SP]);
-        self.push(self.regs[Register::SB]);
-        self.push(self.regs[Register::R3]);
-        self.push(self.regs[Register::R2]);
-        self.push(self.regs[Register::R1]);
-        self.push(self.regs[Register::R0]);
+        self.regs[Register::IP] = self.pop();
+        self.regs[Register::ST] = self.pop();
+        self.regs[Register::SP] = self.pop();
+        self.regs[Register::SB] = self.pop();
+        self.regs[Register::R3] = self.pop();
+        self.regs[Register::R2] = self.pop();
+        self.regs[Register::R1] = self.pop();
+        self.regs[Register::R0] = self.pop();
     }
 
     /// Pop a word off of the stack
