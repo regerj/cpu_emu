@@ -41,17 +41,20 @@ pub struct StatusRegister {
 
 #[derive(Debug)]
 pub struct Regs {
-    inner: HashMap<Register, Reg>,
+    gpr: HashMap<Register, Reg>,
+    cpu: HashMap<Register, Reg>,
 }
 
 impl Regs {
     pub fn new() -> Self {
         Self {
-            inner: HashMap::from([
+            gpr: HashMap::from([
                 (Register::R0, Reg::new()),
                 (Register::R1, Reg::new()),
                 (Register::R2, Reg::new()),
                 (Register::R3, Reg::new()),
+            ]),
+            cpu: HashMap::from([
                 (Register::IP, Reg::new().with(0xF000)),
                 (Register::ST, Reg::new()),
                 (Register::SB, Reg::new().with(0x0100)),
@@ -61,7 +64,10 @@ impl Regs {
     }
 
     pub fn clear_highlights(&mut self) {
-        self.inner
+        self.gpr
+            .values_mut()
+            .for_each(|reg| reg.highlighted = false);
+        self.cpu
             .values_mut()
             .for_each(|reg| reg.highlighted = false);
     }
@@ -102,6 +108,7 @@ impl From<&Reg> for Span<'_> {
 impl Widget for &Regs {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut lines = vec![
+            Line::from("General Purpose Registers"),
             Line::from(vec![Span::styled(
                 "Reg │ Value",
                 Style::default().add_modifier(Modifier::BOLD),
@@ -109,7 +116,23 @@ impl Widget for &Regs {
             Line::from("────┼────────"),
         ];
 
-        for (name, reg) in self.inner.iter() {
+        for (name, reg) in self.gpr.iter() {
+            let name = Span::from(name.to_string());
+            let spacer = Span::from("  │ ");
+            let reg: Span = reg.into();
+            lines.push(Line::from(vec![name, spacer, reg]));
+        }
+
+        lines.append(&mut vec![
+            Line::from("CPU Registers"),
+            Line::from(vec![Span::styled(
+                "Reg │ Value",
+                Style::default().add_modifier(Modifier::BOLD),
+            )]),
+            Line::from("────┼────────"),
+        ]);
+
+        for (name, reg) in self.cpu.iter() {
             let name = Span::from(name.to_string());
             let spacer = Span::from("  │ ");
             let reg: Span = reg.into();
@@ -125,21 +148,26 @@ impl Widget for &Regs {
 impl Index<Register> for Regs {
     type Output = Word;
     fn index(&self, index: Register) -> &Self::Output {
-        &self
-            .inner
-            .get(&index)
-            .expect("No register by that name")
-            .val
+        if let Some(val) = self.gpr.get(&index) {
+            &val.val
+        } else if let Some(val) = self.cpu.get(&index) {
+            &val.val
+        } else {
+            panic!("No register by that name")
+        }
     }
 }
 
 impl IndexMut<Register> for Regs {
     fn index_mut(&mut self, index: Register) -> &mut Self::Output {
-        let reg = self
-            .inner
-            .get_mut(&index)
-            .expect("No register by that name");
-        reg.highlighted = true;
-        &mut reg.val
+        if let Some(val) = self.gpr.get_mut(&index) {
+            val.highlighted = true;
+            &mut val.val
+        } else if let Some(val) = self.cpu.get_mut(&index) {
+            val.highlighted = true;
+            &mut val.val
+        } else {
+            panic!("No register by that name")
+        }
     }
 }

@@ -29,6 +29,8 @@ flowchart LR
   - psh
   - pop
   - end
+  - cal
+  - ret
   - Labels
 - DRAM
 - SRAM
@@ -41,4 +43,3 @@ flowchart LR
 ## Planned Features
 
 - Virtual Memory / MMU
-- Call/Ret

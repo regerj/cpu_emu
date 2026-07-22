@@ -1,0 +1,18 @@
+mov $r0,0
+cal INC_R0
+cal INC_R0
+cmp $r0,2
+jeq EQ
+// If neq
+mov $r1,0
+jmp END
+// If eq
+EQ:
+mov $r1,1
+END:
+end
+
+// Increments the value in $r0
+INC_R0:
+add $r0,1
+ret

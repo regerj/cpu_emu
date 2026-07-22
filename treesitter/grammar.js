@@ -29,6 +29,8 @@ module.exports = grammar({
       'psh',
       'pop',
       'end',
+      'cal',
+      'ret',
     ),
 
     operand: $ => seq(

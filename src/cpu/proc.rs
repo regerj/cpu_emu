@@ -302,7 +302,7 @@ impl<'a> Cpu {
                     },
                 };
 
-                self.regs[Register::IP] = addr.into_raw();
+                self.jump(addr);
             }
             Operation::Cmp(op0, op1) => {
                 let op0_word = match op0 {
@@ -361,7 +361,7 @@ impl<'a> Cpu {
                 };
 
                 if self.status().zero() {
-                    self.regs[Register::IP] = addr.into_raw();
+                    self.jump(addr);
                 }
             }
             Operation::Jne(dest) => {
@@ -382,7 +382,7 @@ impl<'a> Cpu {
                 };
 
                 if !self.status().zero() {
-                    self.regs[Register::IP] = addr.into_raw();
+                    self.jump(addr);
                 }
             }
             Operation::Psh(val) => {
@@ -402,12 +402,10 @@ impl<'a> Cpu {
                     },
                 };
 
-                self.regs[Register::SP] -= size_of::<Word>() as Word;
-                self.write_addr(PhysAddr::from(self.regs[Register::SP]), val);
+                self.push(val);
             }
             Operation::Pop(into) => {
-                let val = self.read_word(PhysAddr::from(self.regs[Register::SP]));
-                self.regs[Register::SP] += size_of::<Word>() as Word;
+                let val = self.pop();
 
                 match into {
                     Operand::LValue(inner) => {
@@ -428,6 +426,38 @@ impl<'a> Cpu {
             Operation::End => {
                 return None;
             }
+            Operation::Cal(func) => {
+                let addr: PhysAddr = match func {
+                    Operand::LValue(inner) => {
+                        let addr = match inner {
+                            OperandInner::Literal(word) => PhysAddr::new(word),
+                            OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
+                        };
+
+                        assert!(addr.is_word_aligned());
+                        PhysAddr::new(self.read_word(addr))
+                    }
+                    Operand::RValue(inner) => match inner {
+                        OperandInner::Literal(word) => PhysAddr::new(word),
+                        OperandInner::Register(reg) => PhysAddr::new(self.regs[reg]),
+                    },
+                };
+
+                // Push register frame
+                // self.push_regs();
+
+                // Need to push ret address
+                self.push(self.regs[Register::IP]);
+
+                // Reset stack
+                // self.regs[Register::SB] = self.regs[Register::SP];
+                self.jump(addr);
+            }
+            Operation::Ret => {
+                let ret_addr = PhysAddr::from(self.pop());
+                // self.pop_regs();
+                self.jump(ret_addr);
+            }
         }
 
         Some(())
@@ -436,6 +466,48 @@ impl<'a> Cpu {
     /// Get the current value of the status register.
     fn status(&self) -> StatusRegister {
         StatusRegister::from_bits(self.regs[Register::ST])
+    }
+
+    /// Jump to the given address.
+    fn jump(&mut self, addr: PhysAddr) {
+        self.regs[Register::IP] = addr.into_raw();
+    }
+
+    /// Push a word onto the stack.
+    fn push(&mut self, val: Word) {
+        self.regs[Register::SP] -= size_of::<Word>() as Word;
+        self.write_addr(PhysAddr::from(self.regs[Register::SP]), val);
+    }
+
+    /// Push a register frame onto the stack.
+    fn push_regs(&mut self) {
+        self.push(self.regs[Register::R0]);
+        self.push(self.regs[Register::R1]);
+        self.push(self.regs[Register::R2]);
+        self.push(self.regs[Register::R3]);
+        self.push(self.regs[Register::SB]);
+        self.push(self.regs[Register::SP]);
+        self.push(self.regs[Register::ST]);
+        self.push(self.regs[Register::IP]);
+    }
+
+    /// Pop a register frame off of the stack.
+    fn pop_regs(&mut self) {
+        self.regs[Register::IP] = self.pop();
+        self.regs[Register::ST] = self.pop();
+        self.regs[Register::SP] = self.pop();
+        self.regs[Register::SB] = self.pop();
+        self.regs[Register::R3] = self.pop();
+        self.regs[Register::R2] = self.pop();
+        self.regs[Register::R1] = self.pop();
+        self.regs[Register::R0] = self.pop();
+    }
+
+    /// Pop a word off of the stack
+    fn pop(&mut self) -> Word {
+        let val = self.read_word(PhysAddr::from(self.regs[Register::SP]));
+        self.regs[Register::SP] += size_of::<Word>() as Word;
+        val
     }
 
     /// Set the value of the status register.
