@@ -236,13 +236,13 @@ impl<'a> Cpu {
     /// Call a function located at the given address.
     fn call(&mut self, f_addr: PhysAddr) {
         // Push register frame
-        self.push_regs();
+        // self.push_regs();
 
         // Need to push ret address
         self.push(self.regs[Register::IP]);
 
         // Reset stack
-        self.regs[Register::SB] = self.regs[Register::SP];
+        // self.regs[Register::SB] = self.regs[Register::SP];
         self.jump(f_addr);
     }
 
