@@ -83,6 +83,7 @@ fn evaluate_token_stack(stack: &mut Vec<Token>, symbol_table: &HashMap<String, W
         Mneumonics::End => Operation::End,
         Mneumonics::Cal => Operation::Cal(args[0]),
         Mneumonics::Ret => Operation::Ret,
+        Mneumonics::Int => Operation::Int(args[0]),
     }
 }
 

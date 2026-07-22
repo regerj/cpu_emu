@@ -78,6 +78,12 @@ impl Offset {
     }
 }
 
+impl From<Word> for Offset {
+    fn from(value: Word) -> Self {
+        Self(value)
+    }
+}
+
 impl Display for Offset {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "0x{:04X}", self.0)
@@ -199,12 +205,7 @@ impl MemoryController {
     /// Address does not need to be aligned.
     pub fn read(&self, address: PhysAddr) -> u8 {
         telemetry_log!(CONFIG.cycles.dram_read);
-
-        self.eps
-            .iter()
-            .find(|ep| ep.region().contains(address))
-            .expect("Attempt to access unmapped physical address")
-            .read_byte(address)
+        self.sideband_read(address)
     }
 
     /// Write a byte to main memory.

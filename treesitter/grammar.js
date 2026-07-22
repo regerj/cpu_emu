@@ -13,7 +13,7 @@ module.exports = grammar({
       seq(
         $.mnemonic,
         optional($.operand),
-        ',',
+        optional(','),
         optional($.operand),
       ),
     ),
@@ -31,6 +31,7 @@ module.exports = grammar({
       'end',
       'cal',
       'ret',
+      'int',
     ),
 
     operand: $ => seq(
