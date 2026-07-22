@@ -8,6 +8,10 @@ use std::{
         AddAssign,
         Sub,
     },
+    sync::{
+        Arc,
+        RwLock,
+    },
 };
 
 use common::cfg::{
@@ -31,8 +35,10 @@ use ratatui::{
 };
 
 use crate::{
-    CHANGE_STYLE,
-    block::Block,
+    block::{
+        Block,
+        Handle,
+    },
     telemetry_init,
     telemetry_log,
     telemetry_module,
@@ -42,8 +48,8 @@ telemetry_module!(dram);
 
 #[derive(Clone, Copy)]
 pub struct MemoryRegion {
-    begin: PhysAddr,
-    length: Offset,
+    pub begin: PhysAddr,
+    pub length: Offset,
 }
 
 impl MemoryRegion {
@@ -280,7 +286,7 @@ pub struct DramRadio {
 }
 
 impl DramRadio {
-    const REGION: MemoryRegion = MemoryRegion::new(PhysAddr(0x0000), Offset(0xF000));
+    const REGION: MemoryRegion = MemoryRegion::new(PhysAddr(0x0000), Offset(0xE000));
 
     fn normalize_addr(addr: PhysAddr) -> Offset {
         addr - Self::REGION.begin
@@ -293,7 +299,7 @@ impl MemoryFabricEndpoint for DramRadio {
     }
 
     fn region(&self) -> MemoryRegion {
-        MemoryRegion::new(PhysAddr(0x0000), Offset(0xF000))
+        Self::REGION
     }
 
     fn read_byte(&self, addr: PhysAddr) -> u8 {
@@ -323,10 +329,9 @@ impl MemoryFabricEndpoint for DramRadio {
 
 #[derive(Debug)]
 pub struct Dram {
-    inner: Vec<u8>,
+    inner: Arc<RwLock<Vec<u8>>>,
     tx: channel::Sender<Option<u8>>,
     rx: channel::Receiver<MemoryOps>,
-    mirror: Option<channel::Sender<MemoryOps>>,
 }
 
 impl Dram {
@@ -340,104 +345,85 @@ impl Dram {
         };
         (
             Self {
-                inner: vec![0; Word::MAX as usize + 1],
+                inner: Arc::new(RwLock::new(vec![0; Word::MAX as usize + 1])),
                 tx: resp_tx,
                 rx: op_rx,
-                mirror: None,
             },
             radio,
         )
     }
 
-    pub fn mirror(&mut self) -> DramMirror {
-        let (mirror_tx, mirror_rx) = crossbeam::channel::unbounded();
-        self.mirror = Some(mirror_tx);
-        DramMirror {
-            inner: self.inner.clone(),
-            rx: mirror_rx,
-            highlights: Vec::new(),
-        }
-    }
-
     fn read_byte(&self, addr: Offset) -> u8 {
-        self.inner[addr.into_raw() as usize]
+        self.inner.read().expect("DRAM lock poisoned")[addr.into_raw() as usize]
     }
 
     fn write_byte(&mut self, addr: Offset, value: u8) {
-        self.inner[addr.into_raw() as usize] = value;
+        self.inner.write().expect("DRAM lock poisoned")[addr.into_raw() as usize] = value;
     }
 }
 
-impl Block for Dram {
-    fn dispatch(mut self) {
-        loop {
-            let op = self.rx.recv().expect("Panic in memory fabric");
-            match op {
-                MemoryOps::Read(addr) => {
-                    debug!("DRAM reading address {addr}");
-                    self.tx
-                        .send(Some(self.read_byte(addr)))
-                        .expect("Panic in memory fabric");
-                }
-                MemoryOps::Write(addr, value) => {
-                    debug!("DRAM writing address {addr} with value 0x{value:04x}");
-                    self.write_byte(addr, value);
-                    self.tx.send(None).expect("Panic in memory fabric");
-
-                    // Replicate our write op to the mirror
-                    if let Some(mirror) = self.mirror.as_ref() {
-                        mirror.send(op).expect("Panic in memory mirror");
+impl Block<DramHandle> for Dram {
+    fn dispatch(mut self) -> DramHandle {
+        let handle = DramHandle {
+            inner: self.inner.clone(),
+        };
+        std::thread::spawn(move || {
+            loop {
+                let op = self.rx.recv().expect("Panic in memory fabric");
+                match op {
+                    MemoryOps::Read(addr) => {
+                        debug!("DRAM reading address {addr}");
+                        self.tx
+                            .send(Some(self.read_byte(addr)))
+                            .expect("Panic in memory fabric");
+                    }
+                    MemoryOps::Write(addr, value) => {
+                        debug!("DRAM writing address {addr} with value 0x{value:04x}");
+                        self.write_byte(addr, value);
+                        self.tx.send(None).expect("Panic in memory fabric");
+                    }
+                    MemoryOps::Kill => {
+                        self.tx.send(None).expect("Panic in memory fabric");
+                        return;
                     }
                 }
-                MemoryOps::Kill => {
-                    self.tx.send(None).expect("Panic in memory fabric");
-                    return;
-                }
             }
-        }
+        });
+        handle
     }
 }
 
-pub struct DramMirror {
-    inner: Vec<u8>,
-    highlights: Vec<usize>,
-    rx: channel::Receiver<MemoryOps>,
+pub struct DramHandle {
+    inner: Arc<RwLock<Vec<u8>>>,
 }
 
-impl DramMirror {
-    pub fn update(&mut self) {
-        while let Ok(op) = self.rx.try_recv() {
-            if let MemoryOps::Write(addr, value) = op {
-                self.inner[addr.into_raw() as usize] = value;
-                self.highlights.push(addr.into_raw() as usize);
-            }
-        }
-    }
-
-    pub fn clear_highlights(&mut self) {
-        self.highlights.clear();
+impl Handle for DramHandle {
+    fn get_widget(&self) -> impl Widget {
+        self
     }
 }
 
-impl Widget for &DramMirror {
+impl Widget for &DramHandle {
     fn render(self, area: Rect, buf: &mut Buffer) {
         const BYTES_PER_ROW: usize = 16;
         // TODO this some absolute slop, idk why its writing direct to buffer...
         // rewrite it as a text containing lines containing spans for each byte like a well adjusted
         // software engineer not some cretin
         let block = ratatui::widgets::Block::bordered().title("DRAM");
-        let rows = self.inner.chunks(BYTES_PER_ROW);
+        let inner = self.inner.read().expect("Panic in DRAM lock");
+        let rows = inner.chunks(BYTES_PER_ROW);
         let mut text = Text::default();
         for (i, row) in rows.enumerate() {
             let offset = i * BYTES_PER_ROW;
             let mut line = Line::from(format!("{offset:04X}: "));
 
             for (j, byte) in row.iter().enumerate() {
-                let span = if self.highlights.contains(&(offset + j)) {
-                    Span::from(format!("{byte:02X}")).style(*CHANGE_STYLE)
-                } else {
-                    Span::from(format!("{byte:02X}"))
-                };
+                // let span = if self.highlights.contains(&(offset + j)) {
+                //     Span::from(format!("{byte:02X}")).style(*CHANGE_STYLE)
+                // } else {
+                //     Span::from(format!("{byte:02X}"))
+                // };
+                let span = Span::from(format!("{byte:02X}"));
                 line.push_span(span);
                 line.push_span(Span::from(" "));
             }

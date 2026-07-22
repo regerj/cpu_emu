@@ -18,6 +18,7 @@ use crate::{
 
 mod app;
 mod block;
+mod console;
 mod cpu;
 mod macros;
 mod mem;

@@ -1,0 +1,45 @@
+MAIN:
+// Setup idt
+mov *0,SYS_CALL_PUTC
+mov $it,0
+
+// He
+mov $r0,25928
+mov $r1,0
+int 0
+
+// ll
+mov $r0,27756
+mov $r1,2
+int 0
+
+// 'o '
+mov $r0,8303
+mov $r1,4
+int 0
+
+// Wo
+mov $r0,28503
+mov $r1,6
+int 0
+
+// rl
+mov $r0,27762
+mov $r1,8
+int 0
+
+// d!
+mov $r0,8548
+mov $r1,10
+int 0
+end
+
+// $r0: char
+// $r1: buf_idx
+SYS_CALL_PUTC:
+// Calculate address in display buffer
+mov $r2,57344
+add $r2,$r1
+// Write
+mov *$r2,$r0
+ret
